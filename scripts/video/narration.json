@@ -16,7 +16,7 @@
     },
     {
       "id": "agent",
-      "text": "Now the agent. This page registers fourteen tools through WebMCP, and the browser's own get-tools call sees them. The agent starts with workspace status, then runs one privacy scan across everything."
+      "text": "Now the agent. This page registers seventeen tools through WebMCP, plus one declarative form, and the browser's own get-tools call sees all of them. The agent starts with workspace status, then runs one privacy scan across everything."
     },
     {
       "id": "contract",
@@ -28,7 +28,7 @@
     },
     {
       "id": "crossfile",
-      "text": "Cross-file reasoning is where an agent earns its keep. Compare version two with version three. Merge every internal date into one timeline, and flag the anomalies, like a document that claims to be newer than the archive it was found in."
+      "text": "Cross-file reasoning is where an agent earns its keep. Who appears where, across every file. Which files are byte-identical copies, even inside archives. What changed between version two and version three. And every internal date on one timeline, with anomalies flagged, like a document that claims to be newer than the archive it was found in."
     },
     {
       "id": "archive",

@@ -234,9 +234,15 @@ async function record(durations) {
   })
 
   await scene('crossfile', async () => {
+    await agent('entities')
+    await expandLatestCall()
+    await page.waitForTimeout(2600)
+    await agent('duplicates')
+    await expandLatestCall()
+    await page.waitForTimeout(2400)
     await agent('compare', { a: 'contracts/Q3-services-agreement-v2.docx', b: 'contracts/Q3-services-agreement-v3.docx' })
     await expandLatestCall()
-    await page.waitForTimeout(2500)
+    await page.waitForTimeout(2400)
     await agent('timeline')
     await expandLatestCall()
     await move(1500, 560, 20)

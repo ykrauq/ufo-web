@@ -135,7 +135,8 @@ export async function runScriptedDemo(): Promise<void> {
     await pause(600)
 
     say('agent', 'Proposing actions. Your call on each.')
-    const strip = files.find((f) => ['jpeg', 'png', 'docx', 'xlsx', 'pptx', 'pdf', 'docm', 'xlsm', 'pptm'].includes(f.kind) && (f.flags.includes('has_gps') || f.flags.includes('has_author')))
+    const cleanable = files.filter((f) => ['jpeg', 'png', 'docx', 'xlsx', 'pptx', 'pdf', 'docm', 'xlsm', 'pptm'].includes(f.kind) && (f.flags.includes('has_gps') || f.flags.includes('has_author')))
+    const strip = cleanable.sort((a, b) => (b.flags.includes('has_gps') ? 4 : 0) + (b.flags.includes('has_device_ids') ? 2 : 0) + b.flags.length - ((a.flags.includes('has_gps') ? 4 : 0) + (a.flags.includes('has_device_ids') ? 2 : 0) + a.flags.length))[0]
     if (strip) await invoke('propose_action', { path: strip.path, action: 'strip_metadata', reason: `Identity metadata (${strip.flags.filter((x) => ['has_gps', 'has_author', 'has_device_ids', 'has_comments', 'has_revision_history'].includes(x)).join(', ')}) would leave with this file.`, severity: 'high' })
     const quarantine = files.find((f) => f.flags.includes('has_executable') || f.flags.includes('has_macros'))
     if (quarantine) await invoke('propose_action', { path: quarantine.path, action: 'quarantine', reason: quarantine.flags.includes('has_executable') ? 'Carries executable code. Keep it out of anything shared.' : 'Carries a macro project. Keep it out of anything shared until reviewed.', severity: 'high' })
@@ -152,7 +153,8 @@ export async function runScriptedDemo(): Promise<void> {
     const results = await invoke('list_proposals', {})
     const list = (results.proposals ?? []) as { status: string; action: string; result?: { message?: string } }[]
     const approved = list.filter((p) => p.status === 'approved')
-    say('agent', `${approved.length} approved, ${list.length - approved.length} rejected.${approved.find((p) => p.action === 'strip_metadata')?.result?.message ? ` Cleaned copy: ${approved.find((p) => p.action === 'strip_metadata')!.result!.message}.` : ''} Exporting the report.`)
+    const stripResult = approved.find((p) => p.action === 'strip_metadata')?.result?.message
+    say('agent', `${approved.length} approved, ${list.length - approved.length} rejected.${stripResult ? ` ${stripResult[0].toUpperCase()}${stripResult.slice(1)}.` : ''} Exporting the report.`)
     const report = await invoke('export_report', { format: 'markdown' })
     say('agent', `Report ready: ${report.file} (${report.bytes} bytes). It ends with the ufo command line that reproduces these receipts.`)
   } catch (error) {
