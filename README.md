@@ -113,6 +113,9 @@ call nothing.
   exposed as a tool, the text has nothing to act on.
 - The declarative filter form answers agent submissions through `SubmitEvent.respondWith` with the same
   content shape.
+- Verified in the ChatGPT desktop app's built-in browser: in a real session ChatGPT discovered the tools,
+  called the scans and `inspect`, made thirteen suggestions, and after the person executed three read the
+  outcome through `list_proposals` and exported the report. The demo video shows that session.
 - Verified against Chrome 149's own API in [`scripts/probe-api.mjs`](scripts/probe-api.mjs): `getTools()`
   lists 18 tools with their annotations, `executeTool()` round-trips both an imperative and the declarative
   tool, and `toolchange` fires 16 times when the workspace is cleared.
