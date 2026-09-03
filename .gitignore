@@ -1,7 +1,8 @@
-node_modules/
 dist/
-.ssr/
-*.log
 .DS_Store
+*.log
+node_modules/
 scripts/out/
+scripts/video/out/
+.ssr/
 test-results/
