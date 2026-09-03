@@ -1,8 +1,9 @@
 import { useState } from 'react'
 import type { Receipt } from '../core/types'
-import { allReceipts, fileAt, receiptAt, select } from '../core/workspace'
+import { allReceipts, entities, duplicates, fileAt, receiptAt, select } from '../core/workspace'
 import { useWorkspace } from './useWorkspace'
 import { fmtBytes, FlagChip, SeverityTag } from './common'
+import { Icon, familyIcon, categoryIcon } from './icons'
 
 type Tab = 'overview' | 'metadata' | 'text' | 'container' | 'json'
 
@@ -18,17 +19,19 @@ export function DetailPanel() {
     return (
       <div className="detail">
         <div className="detail-head"><h2>{file.name}</h2></div>
-        <p className="muted">{file.status === 'error' ? `Inspection failed: ${file.error}` : 'Inspecting...'}</p>
+        <p className="muted">{file.status === 'error' ? `Inspection failed: ${file.error}` : 'Inspecting…'}</p>
       </div>
     )
   }
   const r = receipt!
   const units = r.text?.units ?? []
   const activeUnit = units.find((u) => u.label === unit) ?? units[0]
+  const parent = r.depth > 0 ? r.path.split('!/')[0] : null
   return (
     <div className="detail">
       <div className="detail-head">
-        <h2>{r.name}</h2>
+        {parent && <button className="link small" onClick={() => select(parent)}>← inside {parent}</button>}
+        <h2><Icon name={familyIcon(r.family, r.kind)} size={20} className="head-icon" /> {r.name}</h2>
         <div className="detail-sub">
           <span>{r.label}</span>
           <span>{fmtBytes(r.sizeBytes)}</span>
@@ -36,9 +39,9 @@ export function DetailPanel() {
         </div>
         <div className="detail-flags">{r.flags.map((f) => <FlagChip key={f} flag={f} />)}</div>
       </div>
-      <div className="tabs">
+      <div className="tabs" role="tablist">
         {(['overview', 'metadata', 'text', 'container', 'json'] as Tab[]).map((t) => (
-          <button key={t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)} disabled={(t === 'text' && !units.length) || (t === 'container' && !r.container)}>
+          <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)} disabled={(t === 'text' && !units.length) || (t === 'container' && !r.container)}>
             {t === 'overview' ? `Findings (${r.findings.length})` : t === 'text' ? `Text (${units.length})` : t === 'container' ? `Inside (${r.container?.entryCount ?? 0})` : t === 'json' ? 'Receipt JSON' : 'Metadata'}
           </button>
         ))}
@@ -57,7 +60,7 @@ export function DetailPanel() {
           <ul className="findings">
             {r.findings.map((f) => (
               <li key={f.id} className={`finding finding-${f.severity}`}>
-                <div className="finding-head"><SeverityTag severity={f.severity} /><strong>{f.title}</strong>{f.where && <span className="muted">{f.where}</span>}<span className="muted mono">{f.id}</span></div>
+                <div className="finding-head"><Icon name={categoryIcon(f.category)} className="finding-icon" /><SeverityTag severity={f.severity} /><strong>{f.title}</strong>{f.where && <span className="muted">{f.where}</span>}<span className="muted mono fid">{f.id}</span></div>
                 <div className="finding-detail">{f.detail}</div>
                 {f.evidence && <pre className="evidence">{f.evidence}</pre>}
               </li>
@@ -81,7 +84,7 @@ export function DetailPanel() {
           {r.dates.length > 0 && (
             <>
               <h3>Dates found inside</h3>
-              <ul className="small">{r.dates.map((d, i) => <li key={i}><span className="mono">{d.when}</span> {d.what} <span className="muted">({d.source})</span></li>)}</ul>
+              <ul className="small dates">{r.dates.map((d, i) => <li key={i}><span className="mono">{d.when.replace('T', ' ').slice(0, 19)}</span> {d.what} <span className="muted">({d.source})</span></li>)}</ul>
             </>
           )}
         </div>
@@ -91,7 +94,7 @@ export function DetailPanel() {
           <div className="unit-picker">
             {units.map((u) => <button key={u.label} className={u.label === activeUnit.label ? 'active' : ''} onClick={() => setUnit(u.label)}>{u.label} <span className="muted">{u.text.length}</span></button>)}
           </div>
-          <pre className="text-view">{activeUnit.text.slice(0, 20000) || '(empty)'}{activeUnit.text.length > 20000 ? '\n...[truncated in view]' : ''}</pre>
+          <pre className="text-view">{activeUnit.text.slice(0, 20000) || '(empty)'}{activeUnit.text.length > 20000 ? '\n…[truncated in view]' : ''}</pre>
         </div>
       )}
       {tab === 'container' && r.container && (
@@ -121,8 +124,10 @@ export function DetailPanel() {
 }
 
 function stripText(r: Receipt): Receipt {
-  return { ...r, text: r.text ? { ...r.text, units: r.text.units.map((u) => ({ label: u.label, text: u.text.length > 400 ? u.text.slice(0, 400) + '...' : u.text })) } : undefined, container: r.container ? { ...r.container, nested: r.container.nested.map(stripText) } : undefined }
+  return { ...r, text: r.text ? { ...r.text, units: r.text.units.map((u) => ({ label: u.label, text: u.text.length > 400 ? u.text.slice(0, 400) + '…' : u.text })) } : undefined, container: r.container ? { ...r.container, nested: r.container.nested.map(stripText) } : undefined }
 }
+
+const RANK = { high: 3, medium: 2, low: 1, info: 0 } as const
 
 function Overview() {
   const receipts = allReceipts()
@@ -131,7 +136,9 @@ function Overview() {
   for (const f of findings) counts[f.severity]++
   const flags = new Map<string, number>()
   for (const r of receipts) for (const f of r.flags) flags.set(f, (flags.get(f) ?? 0) + 1)
-  const top = [...findings].sort((a, b) => ({ high: 3, medium: 2, low: 1, info: 0 }[b.severity] - { high: 3, medium: 2, low: 1, info: 0 }[a.severity])).slice(0, 12)
+  const top = [...findings].sort((a, b) => RANK[b.severity] - RANK[a.severity]).slice(0, 10)
+  const ent = entities()
+  const dup = duplicates()
   return (
     <div className="detail">
       <div className="detail-head"><h2>Workspace</h2>
@@ -145,16 +152,35 @@ function Overview() {
           <div className="stat stat-info"><b>{counts.info}</b><span>info</span></div>
         </div>
         <div className="detail-flags">{[...flags.entries()].sort((a, b) => b[1] - a[1]).map(([f, n]) => <span key={f} className="flag-count"><FlagChip flag={f} /> {n}</span>)}</div>
-        <h3>Top findings</h3>
-        <ul className="findings">
-          {top.map((f) => (
-            <li key={f.id} className={`finding finding-${f.severity}`}>
-              <div className="finding-head"><SeverityTag severity={f.severity} /><strong>{f.title}</strong></div>
-              <div className="finding-detail"><button className="link" onClick={() => select(f.path.split('!/')[0])}>{f.path}</button></div>
-            </li>
-          ))}
-        </ul>
-        <p className="muted">Select a file on the left, or ask your agent: "run a privacy scan and propose what to clean".</p>
+        <div className="overview-grid">
+          <div>
+            <h3>Top findings</h3>
+            <ul className="findings compact">
+              {top.map((f) => (
+                <li key={f.id} className={`finding finding-${f.severity}`}>
+                  <div className="finding-head"><Icon name={categoryIcon(f.category)} className="finding-icon" /><SeverityTag severity={f.severity} /><strong>{f.title}</strong></div>
+                  <div className="finding-detail"><button className="link" onClick={() => select(f.path.split('!/')[0])}>{f.path}</button></div>
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div>
+            <h3>Who appears where</h3>
+            {ent.people.length === 0 && <p className="muted small">No names found in metadata.</p>}
+            <ul className="entity-list">
+              {ent.people.slice(0, 8).map((p) => <li key={p.name}><Icon name="user" size={14} /> <b>{p.name}</b> <span className="muted small">{p.files.length} file{p.files.length === 1 ? '' : 's'} · {p.roles.slice(0, 3).join(', ')}</span></li>)}
+            </ul>
+            {ent.domains.length > 0 && <p className="small muted">Domains: {ent.domains.slice(0, 5).map((d) => d.name).join(', ')}</p>}
+            {ent.organizations.length > 0 && <p className="small muted">Organizations: {ent.organizations.slice(0, 4).map((d) => d.name).join(', ')}</p>}
+            {dup.identical.length > 0 && (
+              <>
+                <h3>Byte-identical copies</h3>
+                <ul className="small">{dup.identical.slice(0, 5).map((g) => <li key={g.sha256}>{g.paths.map((p, i) => <span key={p}>{i > 0 && ' = '}<button className="link" onClick={() => select(p.split('!/')[0])}>{p}</button></span>)}</li>)}</ul>
+              </>
+            )}
+          </div>
+        </div>
+        <p className="muted small">Select a file on the left, or ask your agent: "run a privacy scan and propose what to clean".</p>
       </div>
     </div>
   )

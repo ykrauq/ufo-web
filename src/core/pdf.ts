@@ -99,8 +99,10 @@ export async function inspectPdf(bytes: Uint8Array, path: string): Promise<PdfRe
   }
   let doc: import('pdfjs-dist').PDFDocumentProxy
   const task = lib.getDocument({ data: bytes.slice(), disableFontFace: true, stopAtErrors: false, ...(typeof window !== 'undefined' ? { standardFontDataUrl: '/pdfjs/standard_fonts/' } : {}) })
+  // A wedged parser must never stall the whole inspection queue.
+  const deadline = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('pdf parse timed out after 45 s')), 45_000))
   try {
-    doc = await task.promise
+    doc = await Promise.race([task.promise, deadline])
   } catch (error) {
     const msg = error instanceof Error ? error.message : String(error)
     if (/password/i.test(msg)) {

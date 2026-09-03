@@ -199,7 +199,7 @@ function mask(s: string): string {
 }
 
 const PII_PATTERNS: { type: string; re: RegExp; check?: (m: string) => boolean }[] = [
-  { type: 'email address', re: /[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi },
+  { type: 'email address', re: /[A-Z0-9._%+-]{1,64}@[A-Z0-9.-]{1,253}\.[A-Z]{2,24}/gi },
   { type: 'US SSN-shaped number', re: /\b(?!000|666|9\d\d)\d{3}-(?!00)\d{2}-(?!0000)\d{4}\b/g },
   { type: 'payment card number', re: /\b(?:\d[ -]?){13,19}\b/g, check: (m) => { const d = m.replace(/\D/g, ''); return d.length >= 13 && d.length <= 19 && luhn(d) } },
   { type: 'IBAN', re: /\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){2,7}(?:[ ]?[A-Z0-9]{1,4})?\b/g, check: ibanValid },
@@ -211,10 +211,12 @@ const PII_PATTERNS: { type: string; re: RegExp; check?: (m: string) => boolean }
 const SECRET_PATTERNS: { type: string; re: RegExp }[] = [
   { type: 'AWS access key', re: /\bAKIA[0-9A-Z]{16}\b/g },
   { type: 'private key block', re: /-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----/g },
-  { type: 'GitHub token', re: /\bgh[pousr]_[A-Za-z0-9]{30,}\b/g },
-  { type: 'credential assignment', re: /\b[A-Za-z_]*(?:api[_-]?key|secret|token|password|passwd|pwd)\s*[:=]\s*["']?[A-Za-z0-9_\-./+]{8,}["']?/gi },
-  { type: 'JWT', re: /\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g },
+  { type: 'GitHub token', re: /\bgh[pousr]_[A-Za-z0-9]{30,255}\b/g },
+  { type: 'credential assignment', re: /\b[A-Za-z_]{0,40}(?:api[_-]?key|secret|token|password|passwd|pwd)\s*[:=]\s*["']?[A-Za-z0-9_\-./+]{8,200}["']?/gi },
+  { type: 'JWT', re: /\beyJ[A-Za-z0-9_-]{10,2000}\.[A-Za-z0-9_-]{10,4000}\.[A-Za-z0-9_-]{10,2000}\b/g },
 ]
+
+const MAX_SCAN_LINE = 20_000
 
 function scanPatterns(text: string, patterns: typeof PII_PATTERNS, maxHits: number): PiiReport {
   const counts: Record<string, number> = {}
@@ -222,7 +224,8 @@ function scanPatterns(text: string, patterns: typeof PII_PATTERNS, maxHits: numb
   let total = 0
   const lines = text.split('\n')
   for (let li = 0; li < lines.length && li < 20000; li++) {
-    const line = lines[li]
+    // Very long lines are data (minified code, base64 blobs); scanning their head is enough.
+    const line = lines[li].length > MAX_SCAN_LINE ? lines[li].slice(0, MAX_SCAN_LINE) : lines[li]
     for (const p of patterns) {
       p.re.lastIndex = 0
       let m: RegExpExecArray | null

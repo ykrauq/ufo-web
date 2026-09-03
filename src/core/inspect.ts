@@ -8,6 +8,8 @@ import { inspectImage } from './image'
 import { inspectEmail } from './email'
 import { inspectPdf } from './pdf'
 import { decodeText, scanHiddenChars, scanInjection, scanPii, scanSecrets } from './text'
+import { extractStrings } from './strings'
+import { parsePe } from './pe'
 
 export interface InspectOptions {
   depth?: number
@@ -140,6 +142,27 @@ export async function inspectFile(file: InputFile, opts: InspectOptions = {}): P
         addFlag(receipt, 'has_secrets')
         receipt.findings.push(finalize(file.path, { category: 'security', severity: 'high', flag: 'has_secrets', where: 'content', title: 'Private key material', detail: 'The file contains a PEM private key block.' }))
       }
+    } else if (['executable', 'binary', 'unknown', 'database', 'font', 'audio', 'video'].includes(info.family) && bytes.length > 0) {
+      const { strings, truncated } = extractStrings(bytes)
+      if (strings.length) {
+        units.push({ label: 'strings', text: strings.join('\n') })
+        textTruncated = truncated
+        receipt.metadata.printableStrings = strings.length
+      }
+      if (resolved.kind === 'exe') {
+        const pe = parsePe(bytes)
+        if (pe) {
+          receipt.metadata.peMachine = pe.machine
+          receipt.metadata.peType = pe.isDll ? 'DLL' : 'executable'
+          receipt.metadata.peSubsystem = pe.subsystem
+          receipt.metadata.peSections = pe.sections.join(',') || null
+          if (pe.compiledAt) {
+            receipt.metadata.peCompiledAt = pe.compiledAt
+            receipt.dates.push({ path: file.path, when: pe.compiledAt, what: 'executable linked (PE timestamp)', source: 'PE header' })
+          }
+          receipt.findings.push(finalize(file.path, { category: 'info', severity: 'info', where: 'PE header', title: `${pe.is64 ? '64-bit' : '32-bit'} ${pe.machine} ${pe.isDll ? 'DLL' : 'program'}, ${pe.subsystem}${pe.compiledAt ? `, linked ${pe.compiledAt.slice(0, 10)}` : ''}`, detail: pe.note ?? `Sections: ${pe.sections.join(', ') || 'none'}. The link timestamp is set by the compiler and often survives renaming and repacking.` }))
+        }
+      }
     } else if (resolved.kind === 'ole' || ['doc', 'xls', 'ppt', 'msg'].includes(resolved.kind)) {
       receipt.notAvailableInWeb.push(`Legacy OLE container (${info.label}): metadata and content parsing run in the UFO apps and the ufo CLI, not in the browser edition. Reproduce: ${CLI_COMMANDS.inspect}`)
       receipt.findings.push(finalize(file.path, { category: 'info', severity: 'low', where: 'header', title: `${info.label}: not parsed in the browser edition`, detail: 'Legacy binary Office and Outlook formats carry author names, revision logs, and embedded objects too. Inspect them with the UFO desktop app or ufo inspect.' }))
@@ -231,7 +254,10 @@ async function inspectContainer(receipt: Receipt, listing: ZipListing, file: Inp
         receipt.container.nestedTruncated = true
         break
       }
-      if (entry.sizeBytes > budget.bytes) continue
+      if (entry.sizeBytes > budget.bytes) {
+        receipt.container.nestedTruncated = true
+        continue
+      }
       const zf = listing.zip.file(entry.path)
       if (!zf) continue
       let data: Uint8Array

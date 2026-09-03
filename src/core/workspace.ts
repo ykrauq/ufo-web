@@ -8,6 +8,8 @@ import { stripMetadata, canStripMetadata, suggestedExtension } from './clean'
 import { sha256Hex } from './hash'
 import { kindInfo } from './kinds'
 import { untrustedBlock } from './text'
+import { hexDump } from './strings'
+import JSZip from 'jszip'
 import type { ToolCallRecord } from '../webmcp/register'
 
 export type FileStatus = 'queued' | 'inspecting' | 'done' | 'error'
@@ -68,6 +70,8 @@ export interface WorkspaceState {
   sampleLoaded: boolean
   caseName: string
   events: { at: string; who: 'agent' | 'human' | 'system'; text: string }[]
+  filter: { query: string; flag: string }
+  demoRunning: boolean
 }
 
 const MAX_FILE_BYTES = 150_000_000
@@ -84,6 +88,8 @@ let state: WorkspaceState = {
   sampleLoaded: false,
   caseName: '',
   events: [],
+  filter: { query: '', flag: '' },
+  demoRunning: false,
 }
 
 const listeners = new Set<() => void>()
@@ -106,6 +112,19 @@ function setState(patch: Partial<WorkspaceState>) {
 
 function log(who: WorkspaceState['events'][number]['who'], text: string) {
   setState({ events: [...state.events.slice(-199), { at: new Date().toISOString(), who, text }] })
+}
+
+/** Transcript line from the UI or the scripted demo. */
+export function say(who: WorkspaceState['events'][number]['who'], text: string) {
+  log(who, text)
+}
+
+export function setFilter(filter: Partial<WorkspaceState['filter']>) {
+  setState({ filter: { ...state.filter, ...filter } })
+}
+
+export function setDemoRunning(running: boolean) {
+  setState({ demoRunning: running })
 }
 
 export function recordToolCall(record: ToolCallRecord) {
@@ -179,7 +198,7 @@ function update(path: string, patch: Partial<WorkspaceFile>) {
 
 export function clearWorkspace() {
   for (const d of state.downloads) URL.revokeObjectURL(d.url)
-  setState({ files: [], proposals: [], downloads: [], selectedPath: null, busy: false, sampleLoaded: false, caseName: '', events: [] })
+  setState({ files: [], proposals: [], downloads: [], selectedPath: null, busy: false, sampleLoaded: false, caseName: '', events: [], filter: { query: '', flag: '' } })
 }
 
 export async function loadSampleCase(): Promise<{ added: number; name: string }> {
@@ -659,4 +678,135 @@ export function extractText(path: string, unit?: string, offset = 0, limit = 120
   const slice = u.text.slice(offset, offset + lim)
   const next = offset + lim < u.text.length ? offset + lim : null
   return { path: r.path, unit: u.label, offset, chars: slice.length, total: u.text.length, next_offset: next, units: units.map((x) => ({ label: x.label, chars: x.text.length })), text: untrustedBlock(`${r.path} ${u.label} chars ${offset}-${offset + slice.length}`, slice) }
+}
+
+// ------------------------------------------------------------ cross-file: entities, duplicates, bytes
+
+export interface EntityHit {
+  name: string
+  files: string[]
+  roles: string[]
+}
+
+export interface EntityReport {
+  people: EntityHit[]
+  emails: EntityHit[]
+  domains: EntityHit[]
+  organizations: EntityHit[]
+  devices: EntityHit[]
+}
+
+function collect(map: Map<string, EntityHit>, rawName: string | null | undefined, file: string, role: string) {
+  const name = String(rawName ?? '').replace(/\s+/g, ' ').trim()
+  if (!name || name.length > 120) return
+  const key = name.toLowerCase()
+  const hit = map.get(key) ?? { name, files: [], roles: [] }
+  if (!hit.files.includes(file)) hit.files.push(file)
+  if (!hit.roles.includes(role)) hit.roles.push(role)
+  map.set(key, hit)
+}
+
+function addresses(header: string | number | boolean | null | undefined): { name: string | null; email: string; domain: string }[] {
+  if (typeof header !== 'string') return []
+  const out: { name: string | null; email: string; domain: string }[] = []
+  for (const part of header.split(/,(?![^<]*>)/)) {
+    const m = /^\s*(?:"?([^"<]*)"?\s*)?<?([A-Za-z0-9._%+-]+@([A-Za-z0-9.-]+\.[A-Za-z]{2,}))>?\s*$/.exec(part)
+    if (m) out.push({ name: m[1]?.trim() || null, email: m[2].toLowerCase(), domain: m[3].toLowerCase() })
+  }
+  return out
+}
+
+/** Who and what appears across the workspace: names, addresses, domains, organizations, devices. */
+export function entities(scope?: string): EntityReport {
+  const people = new Map<string, EntityHit>()
+  const emails = new Map<string, EntityHit>()
+  const domains = new Map<string, EntityHit>()
+  const orgs = new Map<string, EntityHit>()
+  const devices = new Map<string, EntityHit>()
+  for (const r of allReceipts()) {
+    if (!inScope(r.path, scope)) continue
+    const m = r.metadata
+    collect(people, m.author as string, r.path, 'author')
+    collect(people, m.lastModifiedBy as string, r.path, 'last modified by')
+    collect(people, m.manager as string, r.path, 'manager')
+    collect(people, m.artist as string, r.path, 'photographer')
+    collect(people, m.xmpCreator as string, r.path, 'XMP creator')
+    collect(orgs, m.company as string, r.path, 'company property')
+    if (m.cameraMake || m.cameraModel) collect(devices, [m.cameraMake, m.cameraModel].filter(Boolean).join(' '), r.path, m.bodySerialNumber ? `camera, serial ${m.bodySerialNumber}` : 'camera')
+    if (m.software) collect(devices, String(m.software), r.path, 'software')
+    if (m.application) collect(devices, String(m.application), r.path, 'application')
+    if (m.xmpCreatorTool && m.xmpCreatorTool !== m.software) collect(devices, String(m.xmpCreatorTool), r.path, 'creator tool')
+    for (const h of ['From', 'To', 'Cc', 'Reply-To', 'Return-Path'] as const) {
+      for (const a of addresses(m[h])) {
+        collect(emails, a.email, r.path, h)
+        collect(domains, a.domain, r.path, h)
+        if (a.name) collect(people, a.name, r.path, `email ${h}`)
+      }
+    }
+    for (const f of r.findings) {
+      if (f.flag === 'has_comments') {
+        const by = /by (.+)$/.exec(f.title)?.[1]
+        for (const n of by ? by.split(/,\s*/) : []) collect(people, n, r.path, 'comment author')
+      }
+      if (f.flag === 'has_tracked_changes') {
+        const authors = /Authors: ([^.]+)\./.exec(f.detail)?.[1]
+        for (const n of authors ? authors.split(/,\s*/) : []) if (n !== 'unknown') collect(people, n, r.path, 'tracked-change author')
+      }
+    }
+    for (const d of r.dates) {
+      const who = /by (.+)$/.exec(d.what)?.[1]
+      if (who && who !== '?') collect(people, who, r.path, d.what.replace(/ by .+$/, ''))
+    }
+  }
+  const sort = (m: Map<string, EntityHit>) => [...m.values()].sort((a, b) => b.files.length - a.files.length || a.name.localeCompare(b.name))
+  return { people: sort(people), emails: sort(emails), domains: sort(domains), organizations: sort(orgs), devices: sort(devices) }
+}
+
+export interface DuplicateGroup {
+  sha256: string
+  bytes: number
+  kind: string
+  paths: string[]
+}
+
+/** Byte-identical files (same sha256 anywhere, including inside archives) and same-name files with different content. */
+export function duplicates(scope?: string): { identical: DuplicateGroup[]; sameNameDifferentContent: { name: string; paths: string[] }[] } {
+  const bySha = new Map<string, DuplicateGroup>()
+  const byName = new Map<string, Map<string, string[]>>()
+  for (const r of allReceipts()) {
+    if (!inScope(r.path, scope)) continue
+    if (r.sizeBytes === 0) continue
+    const g = bySha.get(r.sha256) ?? { sha256: r.sha256, bytes: r.sizeBytes, kind: r.kind, paths: [] }
+    g.paths.push(r.path)
+    bySha.set(r.sha256, g)
+    const name = r.name.toLowerCase()
+    const shas = byName.get(name) ?? new Map<string, string[]>()
+    shas.set(r.sha256, [...(shas.get(r.sha256) ?? []), r.path])
+    byName.set(name, shas)
+  }
+  const identical = [...bySha.values()].filter((g) => g.paths.length > 1).sort((a, b) => b.bytes - a.bytes)
+  const sameName: { name: string; paths: string[] }[] = []
+  for (const [name, shas] of byName) if (shas.size > 1) sameName.push({ name, paths: [...shas.values()].flat() })
+  return { identical, sameNameDifferentContent: sameName }
+}
+
+/** Raw bytes of a file, or of an entry one level inside an archive, as a bounded hex dump. */
+export async function peekBytes(path: string, offset = 0, length = 256): Promise<{ path: string; offset: number; length: number; total: number; hex: string }> {
+  let bytes: Uint8Array | null = null
+  const top = fileAt(path)
+  if (top) bytes = top.bytes
+  else if (path.includes('!/')) {
+    const [parentPath, entry] = path.split('!/', 2)
+    const parent = fileAt(parentPath)
+    if (!parent) throw new Error(`not in workspace: ${parentPath}`)
+    if (entry.includes('!/')) throw new Error('peek_bytes reads at most one archive level deep')
+    const zip = await JSZip.loadAsync(parent.bytes)
+    const f = zip.file(entry)
+    if (!f) throw new Error(`no entry ${entry} in ${parentPath}`)
+    bytes = await f.async('uint8array')
+  }
+  if (!bytes) throw new Error(`not in workspace: ${path}`)
+  const off = Math.max(0, Math.min(offset, bytes.length))
+  const len = Math.max(1, Math.min(length, 512))
+  return { path, offset: off, length: Math.min(len, bytes.length - off), total: bytes.length, hex: hexDump(bytes, off, len) }
 }
