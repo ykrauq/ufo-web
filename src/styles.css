@@ -48,7 +48,7 @@ h3 { font-size: 13px; text-transform: uppercase; letter-spacing: 0.04em; color: 
 .pill-polyfill { border-color: var(--medium); color: var(--medium); }
 .notice { background: #fef3c7; color: #78350f; padding: 6px 18px; font-size: 13px; cursor: pointer; }
 
-.empty { flex: 1; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; gap: 32px; }
+.empty { flex: 1; padding: 40px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 32px; }
 .hero { max-width: 760px; text-align: center; display: flex; flex-direction: column; gap: 14px; }
 .hero h2 { font-size: 26px; line-height: 1.2; }
 .hero p { font-size: 15px; margin: 0; }
