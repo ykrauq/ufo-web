@@ -68,7 +68,7 @@ async function probe(port) {
   }
 }
 
-async function flow(port, flags) {
+async function flow(port, flags, liveUrl) {
   await mkdir(OUT, { recursive: true })
   const browser = await launch(flags)
   const context = await browser.newContext({ viewport: { width: 1440, height: 900 } })
@@ -76,7 +76,7 @@ async function flow(port, flags) {
   const errors = []
   page.on('pageerror', (e) => errors.push(String(e)))
   page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
-  await page.goto(`http://127.0.0.1:${port}/`)
+  await page.goto(liveUrl ? `${liveUrl}/` : `http://127.0.0.1:${port}/`)
   await page.waitForSelector('.pill')
   const mode = await page.evaluate(() => window.ufoWeb.mode())
   const native = await page.evaluate(() => typeof document.modelContext?.getTools === 'function' && !document.modelContext.__polyfill)
@@ -145,18 +145,21 @@ async function flow(port, flags) {
   return errors.length === 0
 }
 
-const { server, port } = await serve(DIST)
-if (!existsSync(join(DIST, 'index.html'))) {
+// --url https://web.universalfileopener.com runs the flow against a deployed origin instead of dist/.
+const urlArg = process.argv.indexOf('--url')
+const liveUrl = urlArg >= 0 ? process.argv[urlArg + 1].replace(/\/$/, '') : null
+if (!liveUrl && !existsSync(join(DIST, 'index.html'))) {
   console.error('dist/ missing; run npm run build first')
   process.exit(2)
 }
+const { server, port } = liveUrl ? { server: null, port: null } : await serve(DIST)
 try {
   if (process.argv.includes('--probe')) await probe(port)
   else {
     const flags = (process.env.CHROME_FLAGS ?? '--enable-features=WebMCP,WebMCPTesting --enable-blink-features=WebMCP').split(' ').filter(Boolean)
-    const ok = await flow(port, flags)
+    const ok = await flow(port, flags, liveUrl)
     process.exitCode = ok ? 0 : 1
   }
 } finally {
-  server.close()
+  server?.close()
 }

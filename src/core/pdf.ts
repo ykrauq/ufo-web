@@ -98,7 +98,7 @@ export async function inspectPdf(bytes: Uint8Array, path: string): Promise<PdfRe
     return out
   }
   let doc: import('pdfjs-dist').PDFDocumentProxy
-  const task = lib.getDocument({ data: bytes.slice(), disableFontFace: true, stopAtErrors: false })
+  const task = lib.getDocument({ data: bytes.slice(), disableFontFace: true, stopAtErrors: false, ...(typeof window !== 'undefined' ? { standardFontDataUrl: '/pdfjs/standard_fonts/' } : {}) })
   try {
     doc = await task.promise
   } catch (error) {
