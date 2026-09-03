@@ -1,8 +1,11 @@
+.claude/
 dist/
 .DS_Store
 *.log
+.mcp.json
 node_modules/
 scripts/out/
 scripts/video/out/
 .ssr/
 test-results/
+tsconfig.tsbuildinfo
