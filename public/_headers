@@ -8,6 +8,17 @@
 /samples/*
   Cache-Control: public, max-age=86400
 
+/pdfjs/*
+  Cache-Control: public, max-age=604800
+
+# no-transform keeps Cloudflare from injecting its analytics beacon into the
+# HTML, which the CSP below would (correctly) refuse to run anyway.
+/
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+
+/index.html
+  Cache-Control: public, max-age=0, must-revalidate, no-transform
+
 /*
   X-Content-Type-Options: nosniff
   Referrer-Policy: strict-origin-when-cross-origin
