@@ -53,6 +53,23 @@ function compactReceipt(r: Receipt, section: string) {
   return summary
 }
 
+/** Scan results grouped per file and kept inside the output budget: counts plus the top titles. */
+function groupedScan(findings: ReturnType<typeof ws.findingsIn>, next: string) {
+  const counts = { high: 0, medium: 0, low: 0, info: 0 }
+  const per = new Map<string, { high: number; medium: number; low: number; top: string[]; ids: string[] }>()
+  for (const f of findings) {
+    counts[f.severity]++
+    const entry = per.get(f.path) ?? { high: 0, medium: 0, low: 0, top: [], ids: [] }
+    if (f.severity !== 'info') entry[f.severity]++
+    if (entry.top.length < 3) entry.top.push(`[${f.severity[0]}] ${f.title.slice(0, 72)}`)
+    entry.ids.push(f.id)
+    per.set(f.path, entry)
+  }
+  const files = [...per.entries()].sort((a, b) => b[1].high * 100 + b[1].medium * 10 + b[1].low - (a[1].high * 100 + a[1].medium * 10 + a[1].low))
+  const shown = files.slice(0, 12).map(([path, e]) => ({ path, high: e.high, medium: e.medium, low: e.low, top: e.top }))
+  return { findings: findings.length, counts, files: files.length, by_file: shown, more_files: Math.max(0, files.length - shown.length), next }
+}
+
 const baseTools: ToolSpec<never>[] = [
   {
     name: 'workspace_status',
@@ -99,7 +116,7 @@ const fileTools: ToolSpec<never>[] = [
         filter: { type: 'string', description: 'Path substring or glob, e.g. "contracts/" or "*.pdf"' },
         kind: { type: 'string', description: 'Exact kind id such as pdf, docx, xlsx, jpeg, zip, eml' },
         family: { type: 'string', enum: ['document', 'spreadsheet', 'presentation', 'archive', 'image', 'audio', 'video', 'executable', 'database', 'email', 'text', 'code', 'font', 'certificate', 'binary', 'unknown'] },
-        flag: { type: 'string', description: `One flag: ${FLAG_LIST.split(', ').slice(0, 8).join(', ')}, ...` },
+        flag: { type: 'string', description: 'Only files carrying this flag, e.g. has_gps, has_hidden_text, has_macros, type_mismatch, has_pii' },
         include_nested: { type: 'boolean', description: 'Also list files found inside archives (paths use archive.zip!/entry)' },
         limit: { type: 'integer', minimum: 1, maximum: 200 },
         offset: { type: 'integer', minimum: 0 },
@@ -110,7 +127,7 @@ const fileTools: ToolSpec<never>[] = [
     run: (input: { filter?: string; kind?: string; family?: string; flag?: string; include_nested?: boolean; limit?: number; offset?: number }) => {
       const all = ws.listFiles({ filter: input.filter, kind: input.kind, family: input.family, flag: input.flag, includeNested: input.include_nested })
       const offset = input.offset ?? 0
-      const limit = input.limit ?? 40
+      const limit = input.limit ?? 25
       const page = all.slice(offset, offset + limit)
       return { total: all.length, offset, files: page.map((f) => ({ path: f.path, kind: f.kind, bytes: f.bytes, flags: f.flags, findings: f.findings, high: f.high, ...(f.status !== 'done' ? { status: f.status } : {}), ...(f.quarantined ? { quarantined: true } : {}) })), next_offset: offset + limit < all.length ? offset + limit : null }
     },
@@ -184,7 +201,7 @@ const fileTools: ToolSpec<never>[] = [
     inputSchema: {
       type: 'object',
       properties: {
-        flags: { type: 'array', items: { type: 'string' }, description: `All of these flags must be present. Flags: ${FLAG_LIST.slice(0, 120)}...` },
+        flags: { type: 'array', items: { type: 'string' }, description: 'All of these flags must be present, e.g. has_gps, has_author, has_macros, has_hidden_text, type_mismatch (full list in results)' },
         any_flags: { type: 'array', items: { type: 'string' }, description: 'At least one of these flags must be present' },
         kind: { type: 'string' },
         family: { type: 'string' },
@@ -220,11 +237,7 @@ const fileTools: ToolSpec<never>[] = [
     example: {},
     run: (input: { scope?: string; min_severity?: 'info' | 'low' | 'medium' | 'high' }) => {
       const findings = ws.findingsIn(input.scope, ['privacy', 'hidden', 'security'], input.min_severity ?? 'low')
-      const byFile: Record<string, string[]> = {}
-      for (const f of findings) (byFile[f.path] ??= []).push(`${f.id} [${f.severity}] ${f.title}`)
-      const counts = { high: 0, medium: 0, low: 0, info: 0 }
-      for (const f of findings) counts[f.severity]++
-      return { findings: findings.length, counts, files: Object.keys(byFile).length, by_file: Object.fromEntries(Object.entries(byFile).slice(0, 20).map(([k, v]) => [k, v.slice(0, 6)])), next: 'inspect(path, "findings") for evidence; propose_action(path, "strip_metadata"|"flag"|"quarantine", reason)' }
+      return groupedScan(findings, 'inspect(path,"findings") for evidence; propose_action(path,"strip_metadata"|"flag"|"quarantine",reason)')
     },
   },
   {
@@ -241,9 +254,7 @@ const fileTools: ToolSpec<never>[] = [
     example: {},
     run: (input: { scope?: string }) => {
       const findings = ws.findingsIn(input.scope, ['hidden', 'integrity', 'security'], 'low').filter((f) => f.category === 'hidden' || ['has_hidden_chars', 'has_trailing_data', 'has_injection_text', 'has_nested_archive', 'type_mismatch'].includes(f.flag ?? ''))
-      const byFile: Record<string, string[]> = {}
-      for (const f of findings) (byFile[f.path] ??= []).push(`${f.id} [${f.severity}] ${f.title}${f.where ? ` @ ${f.where}` : ''}`)
-      return { findings: findings.length, files: Object.keys(byFile).length, by_file: Object.fromEntries(Object.entries(byFile).slice(0, 20).map(([k, v]) => [k, v.slice(0, 6)])), next: 'extract_text(path, unit) with unit = "hidden text", "white text", "tracked deletions", "sheet <name>", "notes <n>", "invisible text" to read what is hidden' }
+      return groupedScan(findings, 'extract_text(path,unit) with unit "hidden text"|"white text"|"tracked deletions"|"sheet <name>"|"notes <n>"|"invisible text" reads what is hidden')
     },
   },
   {

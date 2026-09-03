@@ -202,6 +202,7 @@ export async function registerGroup(name: string, tools: ToolSpec<never>[]): Pro
       await ctx.registerTool(toDescriptor(spec), { signal: controller.signal })
     } catch (error) {
       console.error('registerTool failed', spec.name, error)
+      groups.get(name)!.tools = groups.get(name)!.tools.filter((t) => t !== spec)
     }
   }
   return mode
