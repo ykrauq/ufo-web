@@ -12,8 +12,7 @@ sheets and slides, GPS and camera serials, macros, nested archives, look-alike c
 personal-data patterns, prompt-injection text, who appears where, what is a copy of what. You see the
 file itself, hidden parts lit up on demand, and you hold the execute button.
 
-It is the open-source browser edition of [Universal File Opener](https://universalfileopener.com) and
-emits receipts with the same identity fields as the `ufo inspect --json` command line.
+It is the open-source browser edition of [Universal File Opener](https://universalfileopener.com).
 
 ![UFO Web with the sample case loaded](docs/screenshot.png)
 
@@ -90,7 +89,7 @@ is fictional.
 | `peek_bytes` | Bounded hex dump of any file or archive entry | read-only |
 | `propose_action` | Suggest note, flag, strip_metadata, rename_extension, quarantine; the person executes or dismisses | writes a suggestion |
 | `list_proposals` | Decisions and results (cleaned-copy hash, findings before/after) | read-only |
-| `export_report` | JSON or Markdown: receipts, findings, decisions, `ufo` CLI reproduce block | offers a download |
+| `export_report` | JSON or Markdown: receipts, findings, decisions, what needs the apps | offers a download |
 | `filter_file_list` | The sidebar's filter form, exposed through the **declarative** API (`toolname`, `toolparamdescription`, `toolautosubmit`); the agent and the person see the same filtered list | declarative, Chrome |
 
 All seventeen imperative tools are registered at page load, so a host sees the whole set on first contact.
@@ -157,10 +156,7 @@ Office packages, pdf.js for PDF, exifr for EXIF/XMP/IPTC. pdf-lib rewrites PDFs 
   SSN, card (Luhn), IBAN (mod-97), email, phone, address, IP patterns; credential-shaped strings; text
   addressed to AI agents. All scanners are linear in input size; long lines are capped.
 
-The receipt schema is [`src/core/types.ts`](src/core/types.ts). Its identity fields (`path`, `name`,
-`kind`, `extension`, `sizeBytes`, `sha256`, `lastModifiedMillis`, `nameSaysKind`, `bytesSayKind`,
-`nameAndBytesDisagree`) are the ones `ufo inspect --json` prints, so a web receipt and a CLI receipt line up
-on identity. The rest of the receipt (findings, text units, containers) is the web edition's own.
+The receipt schema is [`src/core/types.ts`](src/core/types.ts).
 
 ## Tests
 
@@ -201,7 +197,7 @@ The files are the attacker's input, and the agent is a reader that can be talked
 - Per file 150 MB, workspace 600 MB, 1500 files, PDFs read to 60 pages, sheets to 2000 rows, nested
   archives two levels deep, text scanned to 600K characters per file.
 - Legacy OLE formats (.doc, .xls, .ppt, .msg), RAR/7z contents, OCR, redaction, repair and conversion are not in
-  the browser edition. The receipts say so and name the app or command that does it.
+  the browser edition. The receipts say so.
 - Pattern matches are pattern matches. Card numbers pass Luhn and IBANs pass mod-97; emails and phones are
   shape matches.
 
@@ -222,10 +218,14 @@ a CSP with no external destinations at all.
 ## Relation to Universal File Opener
 
 UFO Web is the free, open, browser-sized slice of [UFO](https://universalfileopener.com): inspection,
-preview and cross-file reasoning, in the tab. The Android app, and UFO for Windows 1.1 with its `ufo`
-command line (in Microsoft Store certification at the time of writing), carry the parsers for the long tail
-(legacy Office, RAR, fonts, certificates, databases) and the actions that change files (OCR, redaction,
-conversion, editing). The report footer tells you which command reproduces what you saw here.
+preview and cross-file reasoning, in the tab. The apps carry the parsers for the long tail (legacy Office,
+RAR, fonts, certificates, databases) and the actions that change files (OCR, redaction, conversion, editing,
+batch work).
+
+## Trademarks
+
+"UFO", "Universal File Opener" and the logo are trademarks of Krauq LLC. The MIT license covers the code in
+this repository and grants no rights to those names or marks.
 
 ## License
 

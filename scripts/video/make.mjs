@@ -319,7 +319,7 @@ async function record(durations) {
     await page.mouse.wheel(0, 500)
   })
 
-  await showCard(page, 'web.universalfileopener.com', 'Open source, MIT · github.com/ykrauq/ufo-web', 'Same receipt fields as <code>ufo inspect --json</code>, the Universal File Opener command line')
+  await showCard(page, 'web.universalfileopener.com', 'Open source, MIT · github.com/ykrauq/ufo-web', 'The browser edition of Universal File Opener')
   await scene('end', async () => {})
   await page.waitForTimeout(500)
   const tEnd = Date.now()

@@ -1,4 +1,4 @@
-import { RECEIPT_SCHEMA, type Finding, type Flag, type InputFile, type Receipt, type TextUnit, CLI_COMMANDS } from './types'
+import { RECEIPT_SCHEMA, type Finding, type Flag, type InputFile, type Receipt, type TextUnit } from './types'
 import { extensionOf, kindInfo, ZIP_BASED } from './kinds'
 import { fromMagic, resolveKind } from './detect'
 import { sha256Hex } from './hash'
@@ -164,8 +164,8 @@ export async function inspectFile(file: InputFile, opts: InspectOptions = {}): P
         }
       }
     } else if (resolved.kind === 'ole' || ['doc', 'xls', 'ppt', 'msg'].includes(resolved.kind)) {
-      receipt.notAvailableInWeb.push(`Legacy OLE container (${info.label}): metadata and content parsing run in the UFO apps, not in the browser edition. Reproduce identity: ${CLI_COMMANDS.inspect}`)
-      receipt.findings.push(finalize(file.path, { category: 'info', severity: 'low', where: 'header', title: `${info.label}: not parsed in the browser edition`, detail: 'Legacy binary Office and Outlook formats carry author names, revision logs, and embedded objects too. Inspect them with the UFO desktop app or ufo inspect.' }))
+      receipt.notAvailableInWeb.push(`Legacy OLE container (${info.label}): metadata and content parsing run in the Universal File Opener apps, not in the browser edition.`)
+      receipt.findings.push(finalize(file.path, { category: 'info', severity: 'low', where: 'header', title: `${info.label}: not parsed in the browser edition`, detail: 'Legacy binary Office and Outlook formats carry author names, revision logs, and embedded objects too. The Universal File Opener apps open them.' }))
     }
   } catch (error) {
     errors.push(`inspect: ${error instanceof Error ? error.message : String(error)}`)
@@ -341,11 +341,10 @@ function scanText(receipt: Receipt, units: TextUnit[], family: string, kind: str
 
 function capabilities(kind: string, family: string): string[] {
   const out: string[] = []
-  out.push(`Batch receipts for a whole tree with the same identity fields (ufo CLI, UFO for Windows 1.1, in store certification): ${CLI_COMMANDS.inspect}`)
-  if (family === 'archive') out.push(`Safe extraction with sanitized paths and password support: ${CLI_COMMANDS.extract}`)
-  if (family === 'image') out.push(`Image conversion (PNG/JPEG/BMP): ${CLI_COMMANDS.convert}`)
-  if (kind === 'pdf' || family === 'text' || family === 'code') out.push(`Text comparison of two files from the shell: ${CLI_COMMANDS.compare}`)
-  if (['document', 'spreadsheet', 'presentation'].includes(family)) out.push('Editing, conversion, and full-fidelity layout of Office documents: UFO for Android and Windows, not the browser edition.')
-  if (kind === 'pdf') out.push('PDF editing, OCR, redaction, and page tools: UFO for Android (and Windows once public), not the browser edition.')
+  if (family === 'archive') out.push('Extraction, creation and repacking of archives, including RAR and 7z contents: the Universal File Opener apps.')
+  if (family === 'image') out.push('Image editing and conversion: the Universal File Opener apps.')
+  if (['document', 'spreadsheet', 'presentation'].includes(family)) out.push('Editing, conversion and full-fidelity page layout of Office documents: the Universal File Opener apps.')
+  if (kind === 'pdf') out.push('PDF editing, OCR, redaction and page tools: the Universal File Opener apps.')
+  if (['audio', 'video', 'font', 'database', 'certificate'].includes(family)) out.push('Deeper inspection and conversion for this format family: the Universal File Opener apps.')
   return out
 }

@@ -140,7 +140,7 @@ export function App() {
       )}
       <footer className="foot">
         <span>Open source, MIT · <a href="https://github.com/ykrauq/ufo-web" target="_blank" rel="noreferrer">github.com/ykrauq/ufo-web</a></span>
-        <span>The browser edition of <a href="https://universalfileopener.com" target="_blank" rel="noreferrer">Universal File Opener</a>. Same receipt fields as <code>ufo inspect --json</code>.</span>
+        <span>The browser edition of <a href="https://universalfileopener.com" target="_blank" rel="noreferrer">Universal File Opener</a>.</span>
         <span><button className="link" onClick={openAbout}>About</button></span>
         {ws.caseName && <span>Case: {ws.caseName}</span>}
       </footer>

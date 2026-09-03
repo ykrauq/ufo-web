@@ -401,7 +401,7 @@ const fileTools: ToolSpec<never>[] = [
   },
   {
     name: 'export_report',
-    description: 'Build the investigation report: receipts for every file, all findings, every suggestion with the person\'s decision, and the ufo command-line invocations that reproduce the receipts. Offers the file for download in the UI and returns the summary. json (default) or markdown.',
+    description: 'Build the investigation report: receipts for every file, all findings, every suggestion with the person\'s decision, and what needs the desktop apps. Offers the file for download in the UI and returns the summary. json (default) or markdown.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -413,7 +413,7 @@ const fileTools: ToolSpec<never>[] = [
     run: async (input: { format?: 'json' | 'markdown'; include_text?: boolean }) => {
       requireFiles()
       const r = await ws.exportReport(input.format ?? 'json', input.include_text ?? false)
-      return { file: r.name, bytes: r.bytes, sha256: r.download.sha256, summary: r.summary, download: 'offered in the Downloads panel', reproduce: ws.buildReport(false).reproduce.cli[0] }
+      return { file: r.name, bytes: r.bytes, sha256: r.download.sha256, summary: r.summary, download: 'offered in the Downloads panel' }
     },
   },
 ]

@@ -113,7 +113,7 @@ describe('proposals and decisions', () => {
     expect(report.files.some((r) => r.path === 'archive/backup-2024.zip')).toBe(false)
     expect(report.case.quarantined).toBe(1)
     expect(report.summary.proposals).toEqual({ pending: 0, executed: 3, dismissed: 1 })
-    expect(report.reproduce.cli[0]).toMatch(/^ufo inspect --json/)
+    expect(report.beyond.url).toBe('https://universalfileopener.com')
     const md = ws.reportMarkdown(report)
     expect(md).toContain('## Agent suggestions and your decisions')
     expect(md).toContain('**executed**')

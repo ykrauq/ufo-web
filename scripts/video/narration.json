@@ -48,7 +48,7 @@
     },
     {
       "id": "export",
-      "text": "Export the report: every receipt, every finding, every decision, and the ufo command line that reproduces it on a whole tree."
+      "text": "Export the report: every receipt, every finding, every decision, as Markdown or JSON, from a page that never sent a byte anywhere."
     },
     {
       "id": "about",

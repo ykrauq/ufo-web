@@ -156,7 +156,7 @@ export async function runScriptedDemo(): Promise<void> {
     const stripResult = approved.find((p) => p.action === 'strip_metadata')?.result?.message
     say('agent', `${approved.length} executed, ${list.length - approved.length} dismissed.${stripResult ? ` ${stripResult[0].toUpperCase()}${stripResult.slice(1)}.` : ''} Exporting the report.`)
     const report = await invoke('export_report', { format: 'markdown' })
-    say('agent', `Report ready: ${report.file} (${report.bytes} bytes). It ends with the ufo command line that reproduces these receipts.`)
+    say('agent', `Report ready: ${report.file} (${report.bytes} bytes). Every receipt, every finding, every decision.`)
   } catch (error) {
     say('system', `Demo stopped: ${error instanceof Error ? error.message : String(error)}`)
   } finally {

@@ -593,7 +593,7 @@ export interface Report {
   summary: { findings: Record<Severity, number>; flags: Record<string, number>; proposals: Record<Proposal['status'], number> }
   files: Receipt[]
   proposals: Proposal[]
-  reproduce: { cli: string[]; note: string }
+  beyond: { note: string; url: string }
   notAvailableInWeb: string[]
 }
 
@@ -608,9 +608,6 @@ export function buildReport(includeText = false): Report {
   }
   const proposals: Record<Proposal['status'], number> = { pending: 0, executed: 0, dismissed: 0 }
   for (const p of state.proposals) proposals[p.status]++
-  const paths = files.map((r) => `"${r.path}"`)
-  const cli = [`ufo inspect --json ${paths.slice(0, 20).join(' ')}${paths.length > 20 ? ' ...' : ''}`]
-  for (const r of files.filter((x) => x.family === 'archive')) cli.push(`ufo extract --json -o ./extracted "${r.path}"`)
   return {
     schema: 'ufo-web-report/0.1',
     generatedAt: new Date().toISOString(),
@@ -619,7 +616,7 @@ export function buildReport(includeText = false): Report {
     summary: { findings, flags, proposals },
     files: files.map(strip),
     proposals: state.proposals,
-    reproduce: { cli, note: 'The ufo command line, part of UFO for Windows 1.1 (in Microsoft Store certification at the time of writing), emits receipts with the same identity fields for whole trees from a shell. Legacy OLE formats and conversion run there and in the apps.' },
+    beyond: { note: 'UFO Web inspects and previews in the browser. Editing, OCR, redaction, conversion, batch work and the long tail of formats are in the Universal File Opener apps.', url: 'https://universalfileopener.com' },
     notAvailableInWeb: [...new Set(files.flatMap((r) => r.notAvailableInWeb))],
   }
 }
@@ -641,7 +638,7 @@ export function reportMarkdown(report: Report): string {
   for (const p of report.proposals) {
     lines.push(`- ${p.id} ${p.action} on ${p.path}: ${p.reason} -> **${p.status}**${p.decidedAt ? ` by human at ${p.decidedAt}` : ''}${p.result ? ` (${p.result.message})` : ''}`)
   }
-  lines.push('', '## Reproduce with the ufo command line', '', '```', ...report.reproduce.cli, '```', '', report.reproduce.note, '')
+  lines.push('', '## Beyond the browser edition', '', report.beyond.note, report.beyond.url, '')
   if (report.notAvailableInWeb.length) {
     lines.push('## Not available in the browser edition', '')
     for (const n of report.notAvailableInWeb) lines.push(`- ${n}`)

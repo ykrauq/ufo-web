@@ -1,7 +1,6 @@
-// Receipt schema shared in spirit with the `ufo inspect --json` command line:
-// the identity fields (path, name, kind, extension, sizeBytes, sha256,
-// lastModifiedMillis, nameSaysKind, bytesSayKind, nameAndBytesDisagree) use
-// the same names so a web receipt and a CLI receipt line up field for field.
+// Receipt schema. The identity fields (path, name, kind, extension, sizeBytes,
+// sha256, lastModifiedMillis, nameSaysKind, bytesSayKind, nameAndBytesDisagree)
+// are named to line up with Universal File Opener's internal inspection report.
 
 export const RECEIPT_SCHEMA = 'ufo-receipt/0.1'
 
@@ -100,7 +99,7 @@ export interface Receipt {
   text?: TextInfo
   flags: Flag[]
   findings: Finding[]
-  /** Capabilities the browser edition does not have, with the CLI command that does. */
+  /** What the browser edition does not do for this file, and what does. */
   notAvailableInWeb: string[]
   formatPage?: string
   errors: string[]
@@ -115,9 +114,3 @@ export interface InputFile {
   lastModified: number | null
 }
 
-export const CLI_COMMANDS = {
-  inspect: 'ufo inspect --json <file>...',
-  extract: 'ufo extract --json -o <dir> <archive>',
-  convert: 'ufo convert --json -o <out.png|jpg|bmp> <image>',
-  compare: 'ufo compare --json <a> <b>',
-} as const

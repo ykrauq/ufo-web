@@ -17,7 +17,7 @@ const TOOLS: [string, string][] = [
   ['peek_bytes', 'Bounded hex dump of any file or archive entry'],
   ['propose_action', 'Suggest note, flag, strip_metadata, rename_extension or quarantine; the person executes or dismisses'],
   ['list_proposals', 'Decisions and results: cleaned-copy hash, findings before and after'],
-  ['export_report', 'JSON or Markdown report with the ufo CLI reproduce block'],
+  ['export_report', 'JSON or Markdown report: receipts, findings, decisions, what needs the apps'],
   ['filter_file_list', 'The sidebar filter form, exposed through the declarative API'],
 ]
 
@@ -97,9 +97,8 @@ export function About({ onClose }: { onClose: () => void }) {
         <h3><Icon name="folder" /> Relation to Universal File Opener</h3>
         <p>
           UFO Web is the open-source browser edition of <a href="https://universalfileopener.com" target="_blank" rel="noreferrer">Universal File Opener</a>.
-          Its receipts use the same identity fields as the <code>ufo inspect --json</code> command line that ships with UFO for
-          Windows 1.1 (in Microsoft Store certification at the time of writing). The Android and Windows apps carry the long
-          tail of formats and the actions that change files.
+          The apps carry the long tail of formats and the actions that change files: OCR, redaction, editing, conversion,
+          batch work. UFO Web is the part you can hand to an agent in a tab.
         </p>
         <p className="muted small">
           MIT licensed. Source at <a href="https://github.com/ykrauq/ufo-web" target="_blank" rel="noreferrer">github.com/ykrauq/ufo-web</a>.
