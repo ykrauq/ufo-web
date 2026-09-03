@@ -493,7 +493,7 @@ export function propose(input: { path: string; action: ProposalAction; reason: s
   if (!PROPOSAL_ACTIONS.includes(input.action)) throw new Error(`unknown action: ${input.action}`)
   if (input.action === 'strip_metadata') {
     if (!file) throw new Error('strip_metadata applies to top-level files, not entries inside archives')
-    if (!file.receipt || !canStripMetadata(file.receipt.kind)) throw new Error(`strip_metadata is not available for ${file.receipt?.kind ?? 'this file'} in the browser edition; the report will carry the CLI command instead`)
+    if (!file.receipt || !canStripMetadata(file.receipt.kind)) throw new Error(`strip_metadata is not available for ${file.receipt?.kind ?? 'this file'} in the browser edition; the Universal File Opener apps do this`)
   }
   if (input.action === 'rename_extension') {
     if (!file?.receipt) throw new Error('rename_extension applies to top-level inspected files')

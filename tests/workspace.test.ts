@@ -108,7 +108,7 @@ describe('proposals and decisions', () => {
     expect(d4.result).toBeUndefined()
     expect(ws.getState().downloads.length).toBe(2)
   }, 30000)
-  it('keeps quarantined files out of the report and lists decisions and CLI commands', async () => {
+  it('keeps quarantined files out of the report and lists decisions and what needs the apps', async () => {
     const report = ws.buildReport(false)
     expect(report.files.some((r) => r.path === 'archive/backup-2024.zip')).toBe(false)
     expect(report.case.quarantined).toBe(1)
