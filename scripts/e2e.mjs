@@ -38,7 +38,8 @@ function serve(dir) {
 }
 
 async function launch(flags) {
-  return chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--disable-gpu', ...flags] })
+  const extra = (process.env.CHROME_EXTRA_ARGS ?? '').split('|').filter(Boolean)
+  return chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--disable-gpu', ...flags, ...extra] })
 }
 
 async function probe(port) {

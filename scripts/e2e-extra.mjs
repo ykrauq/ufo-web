@@ -41,7 +41,8 @@ function serve() {
 await mkdir(OUT, { recursive: true })
 const { server, port } = liveUrl ? { server: null, port: null } : await serve()
 const origin = liveUrl ?? `http://127.0.0.1:${port}`
-const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--disable-gpu', '--enable-features=WebMCP'] })
+const extra = (process.env.CHROME_EXTRA_ARGS ?? '').split('|').filter(Boolean)
+const browser = await chromium.launch({ executablePath: CHROME, headless: true, args: ['--no-sandbox', '--disable-gpu', '--enable-features=WebMCP', ...extra] })
 let failures = 0
 const check = (ok, label) => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${label}`)
