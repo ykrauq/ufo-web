@@ -9,8 +9,8 @@ UFO Web is a file-investigation workspace that exposes itself to AI agents throu
 really inside every file, in the tab, with no upload. Your agent gets seventeen structured tools to reason
 across all of it: true type versus claimed type, hidden and white text, tracked changes, comments, hidden
 sheets and slides, GPS and camera serials, macros, nested archives, look-alike characters in code,
-personal-data patterns, prompt-injection text, who appears where, what is a copy of what. You get the
-approve button.
+personal-data patterns, prompt-injection text, who appears where, what is a copy of what. You see the
+file itself, hidden parts lit up on demand, and you hold the execute button.
 
 It is the open-source browser edition of [Universal File Opener](https://universalfileopener.com) and
 emits receipts with the same identity fields as the `ufo inspect --json` command line.
@@ -24,22 +24,35 @@ emits receipts with the same identity fields as the `ufo inspect --json` command
 | Orients across hundreds of files (`list_files`, `find`, `search`, `filter_file_list`) | Drops the folder; nothing is uploaded |
 | Reads what humans miss: hidden text, deleted tracked changes, veryHidden sheets, invisible PDF text, bidi characters (`hidden_content_scan`, `extract_text`, `peek_bytes`) | Judges whether it matters |
 | Builds the cross-file picture: who appears where, what is a copy, what happened when (`entities`, `duplicates`, `timeline`, `compare`, `privacy_scan`) | Decides what is acceptable to share |
-| Proposes actions under its own identity (`propose_action`) | **Approves or rejects.** There is no approve tool; the button is human-only |
+| Suggests actions under its own identity (`propose_action`) | **Executes or dismisses.** There is no execute tool; the button is human-only |
 | Writes the report (`export_report`) | Keeps the cleaned copies and the decision log |
 
-Approving `strip_metadata` produces a cleaned copy in the page (JPEG, PNG, Word, Excel, PowerPoint, PDF),
+Executing `strip_metadata` produces a cleaned copy in the page (JPEG, PNG, Word, Excel, PowerPoint, PDF),
 re-inspects it, and records findings before and after. Nothing is ever written over the original.
+
+## Seeing the file
+
+The **Preview** tab shows the file itself, in the tab: images beside their embedded EXIF thumbnail, PDF pages,
+code with syntax highlighting and line numbers, CSV grids, email headers and body, audio and video, and a
+clean-room structured rendering of Word, Excel and PowerPoint: paragraphs, runs, tables, lists, images,
+tracked changes, comments, headers and footers; sheet grids with merged cells, formulas on hover and every
+sheet tab including hidden ones; slides with text and pictures at their positions and speaker notes.
+
+**Reveal hidden** is the point of it. Word's hidden ("vanish") runs, white-on-white text, 1-2pt text and
+deleted tracked text light up in place; hidden rows, columns and sheets appear in Excel; hidden slides and
+notes in PowerPoint; zero-width and bidirectional characters get a visible code-point label in code. It is
+built to show what is there, not to reproduce page layout; full-fidelity rendering lives in the UFO apps.
 
 ## Try it
 
 **ChatGPT desktop (Windows/macOS).** Open https://web.universalfileopener.com in the app's built-in browser
-and ask: *"Load the sample case, run a privacy scan, and propose what to clean before I send these files."*
+and ask: *"Load the sample case, run a privacy scan, and suggest what to clean before I send these files."*
 Site tools need the GPT-5.6 Sol or Terra models.
 
 **Chrome 149+.** Enable `chrome://flags/#enable-webmcp-testing`, open the page, then DevTools → Application →
 WebMCP lists the tools and lets you run them. Or press **Scripted demo** in the header: it replays a fixed
 sequence of tool calls through the browser's own `modelContext.getTools` and `executeTool`, narrates what it
-finds in the transcript, and stops at the proposals until you decide. No language model is involved and it
+finds in the transcript, and stops at the suggestions until you decide. No language model is involved and it
 says so.
 
 **Any browser.** Without a native implementation the page loads the MIT `@mcp-b/global` polyfill so MCP-B
@@ -61,7 +74,7 @@ is fictional.
 
 | Tool | What it does | Notes |
 | --- | --- | --- |
-| `workspace_status` | Counts, progress, findings by severity, pending proposals | read-only |
+| `workspace_status` | Counts, progress, findings by severity, pending suggestions | read-only |
 | `load_sample_case` | Loads the synthetic case | |
 | `list_files` | Tree with true type, size, flags, finding counts; filters; nested entries | read-only |
 | `inspect` | Receipt for one file: identity, name-vs-bytes, flags, findings, container, text units; sections for depth; selects it in the UI | read-only, untrusted content |
@@ -75,7 +88,7 @@ is fictional.
 | `compare` | Two files: bytes, metadata, flags, text diff | read-only |
 | `timeline` | Every internal date merged, with anomalies | read-only |
 | `peek_bytes` | Bounded hex dump of any file or archive entry | read-only |
-| `propose_action` | note, flag, strip_metadata, rename_extension, quarantine; awaits the person | writes a proposal |
+| `propose_action` | Suggest note, flag, strip_metadata, rename_extension, quarantine; the person executes or dismisses | writes a suggestion |
 | `list_proposals` | Decisions and results (cleaned-copy hash, findings before/after) | read-only |
 | `export_report` | JSON or Markdown: receipts, findings, decisions, `ufo` CLI reproduce block | offers a download |
 | `filter_file_list` | The sidebar's filter form, exposed through the **declarative** API (`toolname`, `toolparamdescription`, `toolautosubmit`); the agent and the person see the same filtered list | declarative, Chrome |
@@ -97,8 +110,8 @@ call nothing.
   `next_offset`). A tool that breaks the budget fails to register, on purpose.
 - `execute` returns the spec's `{ content: [{ type: 'text', text }] }`; errors return `isError: true`.
 - Extracted text is always wrapped in `<<<UNTRUSTED FILE CONTENT ...>>>` delimiters and the tool
-  descriptions say so. The sample README contains an injection attempt; because approvals are not exposed
-  as tools, the text has nothing to act on.
+  descriptions say so. The sample README contains an injection attempt; because executing a suggestion is not
+  exposed as a tool, the text has nothing to act on.
 - The declarative filter form answers agent submissions through `SubmitEvent.respondWith` with the same
   content shape.
 - Verified against Chrome 149's own API in [`scripts/probe-api.mjs`](scripts/probe-api.mjs): `getTools()`
@@ -146,15 +159,17 @@ Office packages, pdf.js for PDF, exifr for EXIF/XMP/IPTC. pdf-lib rewrites PDFs 
 
 The receipt schema is [`src/core/types.ts`](src/core/types.ts). Its identity fields (`path`, `name`,
 `kind`, `extension`, `sizeBytes`, `sha256`, `lastModifiedMillis`, `nameSaysKind`, `bytesSayKind`,
-`nameAndBytesDisagree`) are the ones `ufo inspect --json` prints, so a web receipt and a CLI receipt line up.
+`nameAndBytesDisagree`) are the ones `ufo inspect --json` prints, so a web receipt and a CLI receipt line up
+on identity. The rest of the receipt (findings, text units, containers) is the web edition's own.
 
 ## Tests
 
 ```bash
-npm test                      # 60 unit tests: parsers on the sample case, hostile input, the workspace
+npm test                      # 65 unit tests: parsers, renderers, hostile input, the workspace
 node scripts/e2e.mjs          # full flow in Chrome 149 with --enable-features=WebMCP
 node scripts/e2e-extra.mjs    # declarative tool, scripted demo, file picker, mobile, dark mode
 node scripts/probe-api.mjs    # the browser's own getTools / executeTool / toolchange
+node scripts/shots.mjs        # review screenshots of every preview renderer in both themes
 ```
 
 The hostile-input suite truncates every sample at four points, feeds random bytes under all 196 known
@@ -170,7 +185,7 @@ The files are the attacker's input, and the agent is a reader that can be talked
   telemetry, and the app never fetches anything but its own assets and the sample case.
 - **File text is data.** Every tool that returns file-derived text marks it `untrustedContentHint` and wraps
   it in explicit delimiters. Tool descriptions repeat the rule.
-- **The agent cannot act on files.** It can propose. Approval, quarantine, cleaning and downloads happen only
+- **The agent cannot act on files.** It can suggest. Executing, quarantining, cleaning and downloading happen only
   through buttons a person clicks. A prompt injection has no tool to call.
 - **Bounded everything.** Per-file and per-workspace size caps, nested-archive depth and byte budgets,
   page and row limits, capped text scanning, bounded tool outputs with paging, a hard timeout around PDF
@@ -185,8 +200,8 @@ The files are the attacker's input, and the agent is a reader that can be talked
 
 - Per file 150 MB, workspace 600 MB, 1500 files, PDFs read to 60 pages, sheets to 2000 rows, nested
   archives two levels deep, text scanned to 600K characters per file.
-- Legacy OLE formats (.doc, .xls, .ppt, .msg), RAR/7z contents, and repair, OCR, redaction and conversion are
-  not in the browser edition. The receipts say so and name the `ufo` command or app that does it.
+- Legacy OLE formats (.doc, .xls, .ppt, .msg), RAR/7z contents, OCR, redaction, repair and conversion are not in
+  the browser edition. The receipts say so and name the app or command that does it.
 - Pattern matches are pattern matches. Card numbers pass Luhn and IBANs pass mod-97; emails and phones are
   shape matches.
 
@@ -206,11 +221,11 @@ a CSP with no external destinations at all.
 
 ## Relation to Universal File Opener
 
-UFO Web is the free, open, browser-sized slice of [UFO](https://universalfileopener.com): inspection and
-cross-file reasoning, in the tab. The Android and Windows apps, and the `ufo` command line shipped with
-UFO for Windows, carry the parsers for the long tail (legacy Office, RAR, fonts, certificates, databases)
-and the actions that change files (repair, OCR, redaction, conversion). The report footer tells you which
-command reproduces what you saw here.
+UFO Web is the free, open, browser-sized slice of [UFO](https://universalfileopener.com): inspection,
+preview and cross-file reasoning, in the tab. The Android app, and UFO for Windows 1.1 with its `ufo`
+command line (in Microsoft Store certification at the time of writing), carry the parsers for the long tail
+(legacy Office, RAR, fonts, certificates, databases) and the actions that change files (OCR, redaction,
+conversion, editing). The report footer tells you which command reproduces what you saw here.
 
 ## License
 

@@ -4,7 +4,7 @@
 // workspace the investigation group is unregistered (toolchange fires) and it
 // comes back with the next files.
 //
-// Deliberately absent: approve/reject. Decisions are human-only UI actions.
+// Deliberately absent: execute/dismiss. Decisions are human-only UI actions.
 
 import { registerGroup, unregisterGroup, type ToolSpec } from './register'
 import * as ws from '../core/workspace'

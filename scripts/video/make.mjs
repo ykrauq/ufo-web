@@ -1,8 +1,9 @@
-// Produce the demo video: narration with edge-tts, a scripted Chrome 149 session
-// captured through Chrome's own screencast (every frame carries a wall-clock
-// timestamp, so narration lines up exactly), then ffmpeg assembles frames and
-// audio. Tool calls in the recording go through navigator.modelContext.executeTool,
-// the browser's own WebMCP API.
+// Produce the demo video: narration with edge-tts (audio + sentence-timed SRT),
+// a scripted Chrome 149 session captured through Chrome's own screencast
+// (every frame carries a wall-clock timestamp, so audio lines up exactly),
+// subtitles built from the SRT cues offset by scene start, and ffmpeg to
+// assemble frames, audio and burned-in captions. Tool calls in the recording
+// go through navigator.modelContext.executeTool, the browser's own WebMCP API.
 //
 //   node scripts/video/make.mjs            full pipeline -> scripts/video/out/ufo-web-demo.mp4
 //   node scripts/video/make.mjs --tts      narration only
@@ -28,8 +29,8 @@ const FRAMES = join(OUT, 'frames')
 const CHROME = process.env.CHROME_BIN ?? join(homedir(), '.cache', 'ms-playwright', 'chromium-1228', 'chrome-linux64', 'chrome')
 const W = 1920
 const H = 1080
-const PAD_MS = 700
-const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png' }
+const PAD_MS = 650
+const MIME = { '.html': 'text/html', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.json': 'application/json', '.svg': 'image/svg+xml', '.png': 'image/png', '.jpg': 'image/jpeg', '.pdf': 'application/pdf', '.pfb': 'application/octet-stream' }
 
 const narration = JSON.parse(await readFile(join(HERE, 'narration.json'), 'utf8'))
 await mkdir(OUT, { recursive: true })
@@ -41,11 +42,12 @@ async function tts() {
   for (const scene of narration.scenes) {
     const hash = createHash('sha1').update(narration.voice + narration.rate + scene.text).digest('hex').slice(0, 10)
     const file = join(OUT, `tts-${scene.id}-${hash}.mp3`)
-    if (!existsSync(file)) {
-      await run('edge-tts', ['--voice', narration.voice, `--rate=${narration.rate}`, '--text', scene.text, '--write-media', file])
+    const srt = file.replace(/\.mp3$/, '.srt')
+    if (!existsSync(file) || !existsSync(srt)) {
+      await run('edge-tts', ['--voice', narration.voice, `--rate=${narration.rate}`, '--text', scene.text, '--write-media', file, '--write-subtitles', srt])
     }
     const { stdout } = await run('ffprobe', ['-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', file])
-    durations[scene.id] = { file, seconds: Number(stdout.trim()) }
+    durations[scene.id] = { file, srt, seconds: Number(stdout.trim()) }
     console.log(`tts ${scene.id}: ${durations[scene.id].seconds.toFixed(2)}s`)
   }
   await writeFile(join(OUT, 'durations.json'), JSON.stringify(durations, null, 2))
@@ -93,8 +95,8 @@ const CURSOR_SCRIPT = `
 `
 
 function cardHtml(title, subtitle, small) {
-  return `<div id="__card" style="position:fixed;inset:0;z-index:2147483646;background:#0b1220;color:#e5e7eb;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:22px;padding:0 120px">
-  <div style="display:flex;align-items:center;gap:18px"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="96" height="96"><rect width="64" height="64" rx="14" fill="#0f172a"/><ellipse cx="32" cy="36" rx="24" ry="8" fill="#38bdf8"/><ellipse cx="32" cy="30" rx="12" ry="9" fill="#e0f2fe"/><circle cx="20" cy="37" r="2.2" fill="#0f172a"/><circle cx="32" cy="39" r="2.2" fill="#0f172a"/><circle cx="44" cy="37" r="2.2" fill="#0f172a"/></svg><span style="font-size:54px;font-weight:700;letter-spacing:-.02em">UFO Web</span></div>
+  return `<div id="__card" style="position:fixed;inset:0;z-index:2147483646;background:#0b1020;color:#e5e7eb;font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:22px;padding:0 120px 120px">
+  <div style="display:flex;align-items:center;gap:18px"><img src="/logo.svg" width="96" height="96" alt=""><span style="font-size:54px;font-weight:700;letter-spacing:-.02em">UFO Web</span></div>
   <h1 style="font-size:64px;line-height:1.1;margin:0;max-width:1400px">${title}</h1>
   <p style="font-size:30px;color:#94a3b8;margin:0">${subtitle}</p>
   ${small ? `<div style="font-size:22px;color:#64748b;margin-top:30px">${small}</div>` : ''}
@@ -125,8 +127,6 @@ async function record(durations) {
   await page.goto(`http://127.0.0.1:${port}/`)
   await page.waitForSelector('.pill')
 
-  // Chrome's screencast: one JPEG per compositor frame, stamped with wall-clock time.
-  // Started after the only navigation, because a cross-process navigation ends it.
   const cdp = await context.newCDPSession(page)
   const frames = []
   const pending = []
@@ -152,12 +152,13 @@ async function record(durations) {
     if (elapsed < need) await page.waitForTimeout(need - elapsed)
   }
   const move = async (x, y, steps = 25) => page.mouse.move(x, y, { steps })
-  const click = async (selector) => {
-    const el = page.locator(selector).first()
+  const click = async (selectorOrLocator) => {
+    const el = typeof selectorOrLocator === 'string' ? page.locator(selectorOrLocator).first() : selectorOrLocator.first()
     await el.waitFor({ state: 'visible' })
+    await el.scrollIntoViewIfNeeded()
     const box = await el.boundingBox()
-    if (box) await move(box.x + box.width / 2, box.y + box.height / 2, 30)
-    await page.waitForTimeout(250)
+    if (box) await move(box.x + box.width / 2, box.y + box.height / 2, 28)
+    await page.waitForTimeout(220)
     await el.click()
   }
   const agent = async (name, input = {}) => {
@@ -168,7 +169,7 @@ async function record(durations) {
       if (!tool) throw new Error('tool not registered: ' + n)
       return ctx.executeTool(tool, JSON.stringify(i))
     }, [name, input])
-    await page.waitForTimeout(900)
+    await page.waitForTimeout(850)
     return res
   }
   const expandLatestCall = async () => {
@@ -179,6 +180,8 @@ async function record(durations) {
       await head.click()
     }
   }
+  const selectFile = (name) => click(`.file-row[title$="${name}"]`)
+  const tab = (name) => click(page.getByRole('tab', { name }))
 
   await showCard(page, 'Drop files. Investigate them with your agent.', 'Nothing leaves your browser.', 'A WebMCP Challenge entry')
   await page.waitForTimeout(300)
@@ -186,13 +189,13 @@ async function record(durations) {
 
   await hideCard(page)
   await scene('problem', async () => {
-    await move(700, 500, 40)
+    await move(700, 520, 40)
     await page.waitForTimeout(1500)
-    await move(960, 180, 30)
+    await move(960, 330, 30)
     await page.waitForTimeout(1200)
-    await move(1060, 470, 30)
+    await move(1150, 620, 30)
     await page.waitForTimeout(1200)
-    await move(1350, 470, 30)
+    await move(1400, 620, 30)
   })
 
   await scene('load', async () => {
@@ -206,29 +209,52 @@ async function record(durations) {
     await move(150, 1000, 40)
   })
 
+  await scene('preview', async () => {
+    await selectFile('Q3-services-agreement-v3.docx')
+    await tab(/Preview/)
+    await page.waitForSelector('.docx-page', { timeout: 30000 })
+    await move(760, 520, 30)
+    await page.waitForTimeout(1500)
+    await click('.reveal-toggle')
+    await page.waitForTimeout(2600)
+    await selectFile('vendor-payments.xlsx')
+    await page.waitForSelector('.xlsx', { timeout: 30000 })
+    await click('.reveal-toggle')
+    await page.waitForTimeout(700)
+    await click('.sheet-tabs button:nth-child(2)')
+    await page.waitForTimeout(2000)
+    await selectFile('board-update-sept.pptx')
+    await page.waitForSelector('.slide', { timeout: 30000 })
+    await click('.reveal-toggle')
+    await page.waitForTimeout(400)
+    await page.mouse.wheel(0, 1400)
+    await page.waitForTimeout(1500)
+  })
+
   await scene('agent', async () => {
+    await tab(/Findings/)
     await move(1500, 330, 30)
     await agent('workspace_status')
     await agent('privacy_scan')
     await expandLatestCall()
-    await move(1500, 520, 20)
+    await move(1500, 560, 20)
   })
 
   await scene('contract', async () => {
     await agent('inspect', { path: 'contracts/Q3-services-agreement-v3.docx' })
-    await move(700, 450, 30)
+    await move(700, 500, 30)
     await page.waitForTimeout(1600)
     await page.mouse.wheel(0, 260)
     await page.waitForTimeout(2200)
     await agent('extract_text', { path: 'contracts/Q3-services-agreement-v3.docx', unit: 'hidden text' })
     await expandLatestCall()
-    await move(1500, 520, 20)
+    await move(1500, 560, 20)
   })
 
   await scene('pdf', async () => {
     await agent('hidden_content_scan')
     await agent('inspect', { path: 'invoices/invoice-2291.pdf', section: 'findings' })
-    await move(700, 450, 30)
+    await move(700, 500, 30)
     await page.waitForTimeout(1500)
     await page.mouse.wheel(0, 200)
   })
@@ -236,24 +262,24 @@ async function record(durations) {
   await scene('crossfile', async () => {
     await agent('entities')
     await expandLatestCall()
-    await page.waitForTimeout(2600)
+    await page.waitForTimeout(2400)
     await agent('duplicates')
     await expandLatestCall()
-    await page.waitForTimeout(2400)
+    await page.waitForTimeout(2200)
     await agent('compare', { a: 'contracts/Q3-services-agreement-v2.docx', b: 'contracts/Q3-services-agreement-v3.docx' })
     await expandLatestCall()
-    await page.waitForTimeout(2400)
+    await page.waitForTimeout(2000)
     await agent('timeline')
     await expandLatestCall()
-    await move(1500, 560, 20)
+    await move(1500, 600, 20)
   })
 
   await scene('archive', async () => {
     await agent('inspect', { path: 'archive/backup-2024.zip', section: 'container' })
-    await move(700, 420, 30)
-    await page.waitForTimeout(2600)
+    await move(700, 460, 30)
+    await page.waitForTimeout(2400)
     await agent('inspect', { path: 'src/auth_check.py', section: 'findings' })
-    await move(700, 480, 30)
+    await move(700, 520, 30)
   })
 
   await scene('propose', async () => {
@@ -266,14 +292,14 @@ async function record(durations) {
     await page.waitForSelector('.downloads a[download$=".jpg"]', { timeout: 30000 })
     await page.waitForTimeout(1200)
     await click('.proposal-pending:has-text("quarantine") button.primary')
-    await page.waitForTimeout(900)
+    await page.waitForTimeout(800)
     await click('.proposal-pending:has-text("flag") button.primary')
-    await move(1500, 300, 20)
+    await move(1500, 330, 20)
   })
 
   await scene('injection', async () => {
     await agent('inspect', { path: 'README.txt', section: 'findings' })
-    await move(700, 420, 30)
+    await move(700, 460, 30)
   })
 
   await scene('export', async () => {
@@ -283,9 +309,19 @@ async function record(durations) {
     await expandLatestCall()
   })
 
+  await scene('about', async () => {
+    await click('button[aria-label="About"]')
+    await page.waitForSelector('.about')
+    await move(900, 500, 30)
+    await page.waitForTimeout(800)
+    await page.mouse.wheel(0, 500)
+    await page.waitForTimeout(900)
+    await page.mouse.wheel(0, 500)
+  })
+
   await showCard(page, 'web.universalfileopener.com', 'Open source, MIT · github.com/ykrauq/ufo-web', 'Same receipt fields as <code>ufo inspect --json</code>, the Universal File Opener command line')
   await scene('end', async () => {})
-  await page.waitForTimeout(600)
+  await page.waitForTimeout(500)
   const tEnd = Date.now()
 
   await cdp.send('Page.stopScreencast').catch(() => {})
@@ -297,12 +333,74 @@ async function record(durations) {
   console.log(`recorded ${((tEnd - t0) / 1000).toFixed(1)}s, ${frames.length} frames`)
 }
 
+// ------------------------------------------------------------ subtitles
+
+function parseSrt(text) {
+  const cues = []
+  for (const block of text.replace(/\r/g, '').split(/\n\n+/)) {
+    const lines = block.trim().split('\n')
+    const timing = lines.find((l) => l.includes('-->'))
+    if (!timing) continue
+    const [a, b] = timing.split('-->').map((s) => s.trim())
+    const toMs = (s) => {
+      const m = /(\d+):(\d+):(\d+)[,.](\d+)/.exec(s)
+      return m ? ((Number(m[1]) * 60 + Number(m[2])) * 60 + Number(m[3])) * 1000 + Number(m[4].padEnd(3, '0').slice(0, 3)) : 0
+    }
+    const body = lines.slice(lines.indexOf(timing) + 1).join(' ').trim()
+    if (body) cues.push({ start: toMs(a), end: toMs(b), text: body })
+  }
+  return cues
+}
+
+function assTime(ms) {
+  const cs = Math.round(ms / 10)
+  const h = Math.floor(cs / 360000)
+  const m = Math.floor((cs % 360000) / 6000)
+  const s = Math.floor((cs % 6000) / 100)
+  const c = cs % 100
+  return `${h}:${String(m).padStart(2, '0')}:${String(s).padStart(2, '0')}.${String(c).padStart(2, '0')}`
+}
+
+async function buildSubtitles(durations, scenes, totalMs) {
+  const lines = [
+    '[Script Info]',
+    'ScriptType: v4.00+',
+    `PlayResX: ${W}`,
+    `PlayResY: ${H}`,
+    'WrapStyle: 0',
+    'ScaledBorderAndShadow: yes',
+    '',
+    '[V4+ Styles]',
+    'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
+    'Style: Default,Noto Sans,42,&H00FFFFFF,&H00FFFFFF,&H00151B2B,&H64000000,-1,0,0,0,100,100,0.2,0,1,2.4,1.4,2,220,220,52,1',
+    '',
+    '[Events]',
+    'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
+  ]
+  for (let i = 0; i < scenes.length; i++) {
+    const s = scenes[i]
+    const sceneEnd = i + 1 < scenes.length ? scenes[i + 1].startMs : totalMs
+    const d = durations[s.id]
+    if (!d?.srt || !existsSync(d.srt)) continue
+    const cues = parseSrt(await readFile(d.srt, 'utf8'))
+    for (const c of cues) {
+      const start = s.startMs + c.start
+      const end = Math.min(s.startMs + c.end + 120, sceneEnd - 40)
+      if (end <= start) continue
+      const text = c.text.replace(/\\/g, '\\\\').replace(/\{/g, '(').replace(/\}/g, ')')
+      lines.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Default,,0,0,0,,${text}`)
+    }
+  }
+  const path = join(OUT, 'subtitles.ass')
+  await writeFile(path, lines.join('\n') + '\n')
+  return path
+}
+
 // ------------------------------------------------------------ assemble
 
 async function mux(durations) {
   const { totalMs, scenes, frames } = JSON.parse(await readFile(join(OUT, 'timeline.json'), 'utf8'))
   if (!frames.length) throw new Error('no frames recorded')
-  // The first frame stands in for everything before it; the last is held to the end.
   const lines = ['ffconcat version 1.0']
   for (let i = 0; i < frames.length; i++) {
     const start = i === 0 ? 0 : frames[i].t
@@ -313,9 +411,10 @@ async function mux(durations) {
   lines.push(`file '${frames[frames.length - 1].file}'`)
   const list = join(OUT, 'frames.txt')
   await writeFile(list, lines.join('\n') + '\n')
+  const ass = await buildSubtitles(durations, scenes, totalMs)
 
   const inputs = ['-f', 'concat', '-safe', '0', '-i', list]
-  const filters = [`[0:v]fps=30,scale=${W}:${H}:flags=lanczos,format=yuv420p[vout]`]
+  const filters = [`[0:v]fps=30,scale=${W}:${H}:flags=lanczos,format=yuv420p,subtitles=${ass}:fontsdir=/usr/share/fonts[vout]`]
   const labels = []
   scenes.forEach((s, i) => {
     inputs.push('-i', durations[s.id].file)
