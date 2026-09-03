@@ -1,0 +1,5 @@
+employee_id,name,email,phone,ssn,card_on_file,start_date
+1041,Dana Okafor,d.okafor@halcyonridge.example,302-555-0117,219-09-9999,4539 1488 0343 6467,2021-03-15
+1042,Priya Venkataraman,p.venkataraman@halcyonridge.example,302-555-0133,219-09-9998,,2022-07-01
+1043,Tomas Reinholt,t.reinholt@halcyonridge.example,302-555-0161,219-09-9997,5555 5555 5555 4444,2024-01-08
+1044,Marcus Bell,m.bell@northgate-facilities.example,302-555-0142,,,2026-05-20

@@ -22,6 +22,8 @@ export interface ToolSpec<I = Record<string, unknown>> {
   inputSchema: JsonSchema
   readOnly?: boolean
   untrusted?: boolean
+  /** Example input shown in the in-page tool console. */
+  example?: Record<string, unknown>
   /** Return any JSON-serializable value; it is serialized and size-bounded. */
   run: (input: I, signal?: AbortSignal) => Promise<unknown> | unknown
 }
@@ -54,7 +56,7 @@ function emit(record: ToolCallRecord) {
   for (const l of listeners) l({ ...record })
 }
 
-export const OUTPUT_CHAR_BUDGET = 1500
+export const OUTPUT_CHAR_BUDGET = 3000
 export const NAME_CHAR_BUDGET = 30
 export const DESCRIPTION_CHAR_BUDGET = 500
 

@@ -1,0 +1,62 @@
+{
+  "name": "Halcyon Ridge Q3 close (synthetic sample case)",
+  "note": "Every file is synthetic. Names, companies, numbers, and addresses are fictional.",
+  "files": [
+    {
+      "path": "contracts/Q3-services-agreement-v3.docx",
+      "sizeBytes": 3954
+    },
+    {
+      "path": "contracts/Q3-services-agreement-v2.docx",
+      "sizeBytes": 2542
+    },
+    {
+      "path": "finance/vendor-payments.xlsx",
+      "sizeBytes": 3564
+    },
+    {
+      "path": "finance/budget-model.xlsm",
+      "sizeBytes": 3834
+    },
+    {
+      "path": "slides/board-update-sept.pptx",
+      "sizeBytes": 4533
+    },
+    {
+      "path": "invoices/invoice-2291.pdf",
+      "sizeBytes": 2671
+    },
+    {
+      "path": "photos/site-visit-northgate.jpg",
+      "sizeBytes": 8306
+    },
+    {
+      "path": "photos/logo-final.png",
+      "sizeBytes": 1082
+    },
+    {
+      "path": "downloads/statement-august.pdf",
+      "sizeBytes": 637
+    },
+    {
+      "path": "mail/RE wire instructions 2291.eml",
+      "sizeBytes": 1634
+    },
+    {
+      "path": "hr/onboarding-list.csv",
+      "sizeBytes": 444
+    },
+    {
+      "path": "src/auth_check.py",
+      "sizeBytes": 365
+    },
+    {
+      "path": "README.txt",
+      "sizeBytes": 324
+    },
+    {
+      "path": "archive/backup-2024.zip",
+      "sizeBytes": 2678
+    }
+  ]
+}

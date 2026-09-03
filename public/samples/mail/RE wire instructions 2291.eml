@@ -1,0 +1,41 @@
+Return-Path: <billing@meridian-dataworks-secure.example>
+Received: from mx3.halcyonridge.example (mx3.halcyonridge.example [203.0.113.40]) by mail.halcyonridge.example with ESMTPS id 8f2a; Mon, 1 Sep 2026 08:12:44 -0400
+Received: from mail-out.meridian-dataworks-secure.example (unknown [198.51.100.77]) by mx3.halcyonridge.example; Mon, 1 Sep 2026 08:12:41 -0400
+X-Originating-IP: [198.51.100.77]
+X-Mailer: PHPMailer 6.9.1 (https://github.com/PHPMailer/PHPMailer)
+From: "Tomas Reinholt (Meridian Billing)" <t.reinholt@meridiandataworks.example>
+Reply-To: <billing@meridian-dataworks-secure.example>
+To: Dana Okafor <d.okafor@halcyonridge.example>
+Cc: ap@halcyonridge.example
+Subject: RE: Updated wire instructions for invoice 2291
+Date: Mon, 1 Sep 2026 08:12:39 -0400
+Message-ID: <20260901121239.7a1c@meridian-dataworks-secure.example>
+MIME-Version: 1.0
+Content-Type: multipart/mixed; boundary="=_ufo_sample_boundary"
+
+--=_ufo_sample_boundary
+Content-Type: text/plain; charset="utf-8"
+Content-Transfer-Encoding: 8bit
+
+Hi Dana,
+
+Our bank changed. Please use the new account for invoice 2291 ($412,000.00):
+
+  Beneficiary: Meridian Data Works Inc.
+  IBAN: GB82 WEST 1234 5698 7654 32
+  SWIFT: WESTGB2L
+  Reference: INV-2291
+
+Call me on my mobile if anything is unclear: +1 302 555 0188.
+
+Regards,
+Tomas
+
+--=_ufo_sample_boundary
+Content-Type: application/pdf; name="invoice-2291-updated.pdf"
+Content-Disposition: attachment; filename="invoice-2291-updated.pdf"
+Content-Transfer-Encoding: base64
+
+JVBERi0xLjcKJeLjz9MKMSAwIG9iago8PCAvVHlwZSAvQ2F0YWxvZyA+PgplbmRvYmoKdHJhaWxl
+cgo8PCAvUm9vdCAxIDAgUiA+PgolJUVPRgo=
+--=_ufo_sample_boundary--
