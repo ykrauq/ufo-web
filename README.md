@@ -2,7 +2,7 @@
 
 **Drop files. Investigate them with your agent. Nothing leaves your browser.**
 
-Live: **https://web.universalfileopener.com** · Demo video: see [docs/SUBMISSION.md](docs/SUBMISSION.md) · License: MIT
+Live: **https://web.universalfileopener.com** · Demo video: **https://youtu.be/UqJYbbj3ZVE** · License: MIT
 
 UFO Web is a file-investigation workspace that exposes itself to AI agents through
 [WebMCP](https://github.com/webmachinelearning/webmcp). You drop a folder. The page reads what is
