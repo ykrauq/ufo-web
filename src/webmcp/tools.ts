@@ -413,7 +413,7 @@ const fileTools: ToolSpec<never>[] = [
     run: async (input: { format?: 'json' | 'markdown'; include_text?: boolean }) => {
       requireFiles()
       const r = await ws.exportReport(input.format ?? 'json', input.include_text ?? false)
-      return { file: r.name, bytes: r.bytes, sha256: r.download.sha256, summary: r.summary, download: 'offered in the Downloads panel' }
+      return { file: r.name, bytes: r.bytes, sha256: r.download.sha256, summary: r.summary, download: 'offered in the Downloads panel of the page; the panel also has a Copy button for browsers that hide downloads' }
     },
   },
 ]

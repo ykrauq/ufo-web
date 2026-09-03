@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { decide, type Proposal } from '../core/workspace'
+import { decide, say, type Proposal } from '../core/workspace'
 import { useWorkspace } from './useWorkspace'
 import { callTool, registeredTools, getMode } from '../webmcp/register'
 import { fmtBytes, fmtTime, SeverityTag } from './common'
@@ -39,7 +39,10 @@ export function AgentPanel() {
           <h3><Icon name="download" /> Downloads</h3>
           <ul className="downloads">
             {downloads.slice().reverse().map((d) => (
-              <li key={d.id}><a href={d.url} download={d.name}><Icon name="download" size={14} /> {d.name}</a> <span className="muted small">{fmtBytes(d.bytes)} · sha256 {d.sha256.slice(0, 12)}…</span></li>
+              <li key={d.id}>
+                <a href={d.url} download={d.name}><Icon name="download" size={14} /> {d.name}</a> <span className="muted small">{fmtBytes(d.bytes)} · sha256 {d.sha256.slice(0, 12)}…</span>
+                {d.text && <button className="tiny" onClick={() => { void navigator.clipboard.writeText(d.text!).then(() => say('system', `${d.name} copied to the clipboard`)).catch(() => say('system', 'clipboard not available in this browser')) }} title="Copy the report text"><Icon name="note" size={12} /> Copy</button>}
+              </li>
             ))}
           </ul>
         </section>

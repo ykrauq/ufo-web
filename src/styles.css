@@ -383,3 +383,6 @@ table.entries td { padding: 4px 8px 4px 0; border-bottom: 1px solid var(--line);
 .hex { background: var(--panel-2); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow: auto; }
 .hidden-units summary { cursor: pointer; font-size: 13px; }
 audio, video { max-width: 100%; }
+
+button.tiny { padding: 2px 8px; font-size: 11px; margin-left: 8px; }
+.downloads li { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }

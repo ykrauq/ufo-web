@@ -58,6 +58,8 @@ export interface Download {
   url: string
   bytes: number
   sha256: string
+  /** Text content for reports, so a browser that hides downloads can still copy it. */
+  text?: string
 }
 
 export interface WorkspaceState {
@@ -574,11 +576,11 @@ async function perform(p: Proposal): Promise<NonNullable<Proposal['result']>> {
   }
 }
 
-async function addDownload(forPath: string, name: string, bytes: Uint8Array): Promise<Download> {
+async function addDownload(forPath: string, name: string, bytes: Uint8Array, text?: string): Promise<Download> {
   const sha256 = await sha256Hex(bytes)
   const buffer = bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength) as ArrayBuffer
-  const url = URL.createObjectURL(new Blob([buffer], { type: 'application/octet-stream' }))
-  const d: Download = { id: `d${state.downloads.length + 1}`, forPath, name, url, bytes: bytes.length, sha256 }
+  const url = URL.createObjectURL(new Blob([buffer], { type: text ? 'text/plain;charset=utf-8' : 'application/octet-stream' }))
+  const d: Download = { id: `d${state.downloads.length + 1}`, forPath, name, url, bytes: bytes.length, sha256, text }
   setState({ downloads: [...state.downloads, d] })
   return d
 }
@@ -651,7 +653,7 @@ export async function exportReport(format: 'json' | 'markdown', includeText = fa
   const body = format === 'markdown' ? reportMarkdown(report) : JSON.stringify(report, null, 2)
   const bytes = new TextEncoder().encode(body)
   const name = `ufo-web-report.${format === 'markdown' ? 'md' : 'json'}`
-  const d = await addDownload('(report)', name, bytes)
+  const d = await addDownload('(report)', name, bytes, body)
   log('system', `report exported: ${name}`)
   return { name, bytes: bytes.length, summary: report.summary, download: d }
 }
