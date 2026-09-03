@@ -9,3 +9,7 @@ scripts/video/out/
 .ssr/
 test-results/
 tsconfig.tsbuildinfo
+*.swp
+# contest drafts are kept outside the repo
+docs/devpost-story.md
+docs/SUBMISSION.md
