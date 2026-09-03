@@ -372,7 +372,7 @@ async function buildSubtitles(durations, scenes, totalMs) {
     '',
     '[V4+ Styles]',
     'Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding',
-    'Style: Default,Noto Sans,42,&H00FFFFFF,&H00FFFFFF,&H00151B2B,&H64000000,-1,0,0,0,100,100,0.2,0,1,2.4,1.4,2,220,220,52,1',
+    'Style: Default,Noto Sans,40,&H00FFFFFF,&H00FFFFFF,&H00000000,&H6E0A1020,-1,0,0,0,100,100,0.2,0,4,7,0,2,240,240,54,1',
     '',
     '[Events]',
     'Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text',
@@ -387,7 +387,7 @@ async function buildSubtitles(durations, scenes, totalMs) {
       const start = s.startMs + c.start
       const end = Math.min(s.startMs + c.end + 120, sceneEnd - 40)
       if (end <= start) continue
-      const text = c.text.replace(/\\/g, '\\\\').replace(/\{/g, '(').replace(/\}/g, ')')
+      const text = c.text.replace(/\\/g, '\\\\').replace(/\{/g, '(').replace(/\}/g, ')').replace(/web dot universal ?file ?opener dot com/i, 'web.universalfileopener.com').replace(/get-tools/gi, 'getTools')
       lines.push(`Dialogue: 0,${assTime(start)},${assTime(end)},Default,,0,0,0,,${text}`)
     }
   }
