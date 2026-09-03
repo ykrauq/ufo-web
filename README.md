@@ -162,6 +162,25 @@ extensions, builds archives with traversal names, five-level nesting, appended d
 and checks that a 300 KB single-line file scans in under a second. Every case must resolve to a receipt;
 errors are recorded in it, never thrown.
 
+## Threat model
+
+The files are the attacker's input, and the agent is a reader that can be talked to. So:
+
+- **Nothing leaves.** No network destination exists: the CSP allows only the origin itself, there is no
+  telemetry, and the app never fetches anything but its own assets and the sample case.
+- **File text is data.** Every tool that returns file-derived text marks it `untrustedContentHint` and wraps
+  it in explicit delimiters. Tool descriptions repeat the rule.
+- **The agent cannot act on files.** It can propose. Approval, quarantine, cleaning and downloads happen only
+  through buttons a person clicks. A prompt injection has no tool to call.
+- **Bounded everything.** Per-file and per-workspace size caps, nested-archive depth and byte budgets,
+  page and row limits, capped text scanning, bounded tool outputs with paging, a hard timeout around PDF
+  parsing, and scanners that are linear in input size (long lines are truncated before regex work).
+- **Malformed input is expected.** Every parser failure is recorded in the receipt, never thrown; the
+  hostile-input suite exercises truncations, garbage under every extension, traversal names, deep nesting,
+  appended data and encrypted entries.
+- **Cleaned copies are new files.** Originals are never modified; a cleaned copy is re-inspected and its
+  SHA-256 is recorded with the decision.
+
 ## Limits, stated honestly
 
 - Per file 150 MB, workspace 600 MB, 1500 files, PDFs read to 60 pages, sheets to 2000 rows, nested
