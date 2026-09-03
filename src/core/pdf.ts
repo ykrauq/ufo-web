@@ -14,7 +14,7 @@ const PAGE_LIMIT = 60
 type PdfJs = typeof import('pdfjs-dist')
 let pdfjsPromise: Promise<PdfJs> | null = null
 
-async function loadPdfJs(): Promise<PdfJs> {
+export async function loadPdfJs(): Promise<PdfJs> {
   if (!pdfjsPromise) {
     pdfjsPromise = (async () => {
       const lib = await import('pdfjs-dist')

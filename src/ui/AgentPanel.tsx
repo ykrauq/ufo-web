@@ -5,6 +5,22 @@ import { callTool, registeredTools, getMode } from '../webmcp/register'
 import { fmtBytes, fmtTime, SeverityTag } from './common'
 import { Icon, actionIcon } from './icons'
 
+const ACTION_VERB: Record<Proposal['action'], string> = {
+  strip_metadata: 'Strip metadata now',
+  quarantine: 'Quarantine it',
+  rename_extension: 'Offer it renamed',
+  flag: 'Flag it',
+  note: 'Record the note',
+}
+
+const ACTION_EXPLAIN: Record<Proposal['action'], string> = {
+  strip_metadata: 'Creates a cleaned copy for download. The original stays untouched.',
+  quarantine: 'Marks the file and leaves it out of the report and downloads.',
+  rename_extension: 'Offers a download of the same bytes under the true extension.',
+  flag: 'Marks the file for follow-up in the list and the report.',
+  note: 'Records the finding in the report. Changes nothing.',
+}
+
 export function AgentPanel() {
   const { proposals, toolLog, downloads, events } = useWorkspace()
   const pending = proposals.filter((p) => p.status === 'pending')
@@ -13,8 +29,8 @@ export function AgentPanel() {
     <div className="agent">
       <Transcript events={events} />
       <section>
-        <h3><Icon name="check" /> Proposals {pending.length > 0 ? <span className="count count-hot">{pending.length} pending</span> : <span className="muted">{proposals.length ? 'all decided' : 'none yet'}</span>}</h3>
-        {proposals.length === 0 && <p className="muted small">When your agent calls <code>propose_action</code>, it shows up here. Only you can approve.</p>}
+        <h3><Icon name="check" /> Suggestions {pending.length > 0 ? <span className="count count-hot">{pending.length} waiting for you</span> : <span className="muted">{proposals.length ? 'all decided' : 'none yet'}</span>}</h3>
+        {proposals.length === 0 && <p className="muted small">When your agent calls <code>propose_action</code>, a card appears here. You choose whether to execute it or dismiss it. The agent cannot.</p>}
         {pending.map((p) => <ProposalCard key={p.id} p={p} download={downloads.find((d) => d.forPath === p.path)} />)}
         {decided.map((p) => <ProposalCard key={p.id} p={p} download={downloads.slice().reverse().find((d) => d.forPath === p.path)} />)}
       </section>
@@ -64,7 +80,7 @@ function Transcript({ events }: { events: { at: string; who: 'agent' | 'human' |
 
 function ProposalCard({ p, download }: { p: Proposal; download?: { url: string; name: string; bytes: number } }) {
   const [busy, setBusy] = useState(false)
-  const act = async (d: 'approved' | 'rejected') => {
+  const act = async (d: 'executed' | 'dismissed') => {
     setBusy(true)
     try {
       await decide(p.id, d)
@@ -75,7 +91,7 @@ function ProposalCard({ p, download }: { p: Proposal; download?: { url: string; 
   return (
     <div className={`proposal proposal-${p.status}`}>
       <div className="proposal-head">
-        <span className="who who-agent">agent</span>
+        <span className="who who-agent">agent suggests</span>
         <Icon name={actionIcon(p.action)} className="proposal-icon" />
         <strong>{p.action.replace('_', ' ')}</strong>
         <SeverityTag severity={p.severity} />
@@ -84,17 +100,20 @@ function ProposalCard({ p, download }: { p: Proposal; download?: { url: string; 
       <div className="proposal-path mono small">{p.path}</div>
       <div className="proposal-reason">{p.reason}</div>
       {p.status === 'pending' ? (
-        <div className="proposal-actions">
-          <button className="primary" disabled={busy} onClick={() => act('approved')}><Icon name="check" size={14} /> Approve</button>
-          <button disabled={busy} onClick={() => act('rejected')}><Icon name="x" size={14} /> Reject</button>
-          <span className="muted small">human-only</span>
-        </div>
+        <>
+          <div className="proposal-explain muted small">{ACTION_EXPLAIN[p.action]}</div>
+          <div className="proposal-actions">
+            <button className="primary" disabled={busy} onClick={() => act('executed')}><Icon name="play" size={14} /> {ACTION_VERB[p.action]}</button>
+            <button disabled={busy} onClick={() => act('dismissed')}><Icon name="x" size={14} /> Dismiss</button>
+          </div>
+          <div className="muted small">Only you can press these. The agent cannot.</div>
+        </>
       ) : (
         <div className={`proposal-result result-${p.status}`}>
-          <span className="who who-human">you</span> <b>{p.status}</b> {p.decidedAt && <span className="muted small">{fmtTime(p.decidedAt)}</span>}
+          <span className="who who-human">you</span> <b>{p.status === 'executed' ? 'executed' : 'dismissed'}</b> {p.decidedAt && <span className="muted small">{fmtTime(p.decidedAt)}</span>}
           {p.result && <div className="small">{p.result.message}</div>}
           {p.result?.removed && p.result.removed.length > 0 && <div className="small muted">removed: {p.result.removed.join(', ')}</div>}
-          {p.status === 'approved' && download && <a className="dl-inline" href={download.url} download={download.name}><Icon name="download" size={14} /> {download.name} ({fmtBytes(download.bytes)})</a>}
+          {p.status === 'executed' && download && <a className="dl-inline" href={download.url} download={download.name}><Icon name="download" size={14} /> {download.name} ({fmtBytes(download.bytes)})</a>}
         </div>
       )}
     </div>

@@ -37,7 +37,7 @@ export interface Proposal {
   severity: Severity
   proposedBy: 'agent'
   proposedAt: string
-  status: 'pending' | 'approved' | 'rejected'
+  status: 'pending' | 'executed' | 'dismissed'
   decidedAt?: string
   decidedBy?: 'human'
   result?: {
@@ -516,15 +516,15 @@ export function listProposals(status?: Proposal['status']): Proposal[] {
   return state.proposals.filter((p) => !status || p.status === status)
 }
 
-/** Human-only. There is deliberately no WebMCP tool that calls this. */
-export async function decide(id: string, decision: 'approved' | 'rejected'): Promise<Proposal> {
+/** Human-only: execute or dismiss a suggestion. There is deliberately no WebMCP tool that calls this. */
+export async function decide(id: string, decision: 'executed' | 'dismissed'): Promise<Proposal> {
   const p = state.proposals.find((x) => x.id === id)
   if (!p) throw new Error(`unknown proposal ${id}`)
   if (p.status !== 'pending') return p
   const decided: Proposal = { ...p, status: decision, decidedAt: new Date().toISOString(), decidedBy: 'human' }
   setState({ proposals: state.proposals.map((x) => (x.id === id ? decided : x)) })
   log('human', `${decision} ${p.action} on ${p.path}`)
-  if (decision === 'rejected') return decided
+  if (decision === 'dismissed') return decided
   try {
     const result = await perform(decided)
     const done = { ...decided, result }
@@ -606,7 +606,7 @@ export function buildReport(includeText = false): Report {
     for (const f of r.findings) findings[f.severity]++
     for (const fl of r.flags) flags[fl] = (flags[fl] ?? 0) + 1
   }
-  const proposals: Record<Proposal['status'], number> = { pending: 0, approved: 0, rejected: 0 }
+  const proposals: Record<Proposal['status'], number> = { pending: 0, executed: 0, dismissed: 0 }
   for (const p of state.proposals) proposals[p.status]++
   const paths = files.map((r) => `"${r.path}"`)
   const cli = [`ufo inspect --json ${paths.slice(0, 20).join(' ')}${paths.length > 20 ? ' ...' : ''}`]
@@ -619,7 +619,7 @@ export function buildReport(includeText = false): Report {
     summary: { findings, flags, proposals },
     files: files.map(strip),
     proposals: state.proposals,
-    reproduce: { cli, note: 'The ufo command line (UFO for Windows 1.1) emits receipts with the same identity fields, for whole trees, from a shell. Legacy OLE formats, repair, and conversion run there and in the apps.' },
+    reproduce: { cli, note: 'The ufo command line, part of UFO for Windows 1.1 (in Microsoft Store certification at the time of writing), emits receipts with the same identity fields for whole trees from a shell. Legacy OLE formats and conversion run there and in the apps.' },
     notAvailableInWeb: [...new Set(files.flatMap((r) => r.notAvailableInWeb))],
   }
 }
@@ -636,7 +636,7 @@ export function reportMarkdown(report: Report): string {
     for (const f of r.findings) lines.push(`- [${f.severity}] ${f.title}${f.where ? ` (${f.where})` : ''}: ${f.detail}`)
     if (r.findings.length) lines.push('')
   }
-  lines.push('## Agent proposals and human decisions', '')
+  lines.push('## Agent suggestions and your decisions', '')
   if (!report.proposals.length) lines.push('None.', '')
   for (const p of report.proposals) {
     lines.push(`- ${p.id} ${p.action} on ${p.path}: ${p.reason} -> **${p.status}**${p.decidedAt ? ` by human at ${p.decidedAt}` : ''}${p.result ? ` (${p.result.message})` : ''}`)
@@ -809,4 +809,19 @@ export async function peekBytes(path: string, offset = 0, length = 256): Promise
   const off = Math.max(0, Math.min(offset, bytes.length))
   const len = Math.max(1, Math.min(length, 512))
   return { path, offset: off, length: Math.min(len, bytes.length - off), total: bytes.length, hex: hexDump(bytes, off, len) }
+}
+
+/** Bytes of a top-level file or of an entry nested any number of archive levels deep. */
+export async function bytesFor(path: string): Promise<Uint8Array | null> {
+  const parts = path.split('!/')
+  const top = fileAt(parts[0])
+  if (!top) return null
+  let bytes: Uint8Array = top.bytes
+  for (const entry of parts.slice(1)) {
+    const zip = await JSZip.loadAsync(bytes)
+    const f = zip.file(entry)
+    if (!f) return null
+    bytes = await f.async('uint8array')
+  }
+  return bytes
 }

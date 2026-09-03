@@ -1,11 +1,21 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Receipt } from '../core/types'
 import { allReceipts, entities, duplicates, fileAt, receiptAt, select } from '../core/workspace'
 import { useWorkspace } from './useWorkspace'
 import { fmtBytes, FlagChip, SeverityTag } from './common'
 import { Icon, familyIcon, categoryIcon } from './icons'
+import { Preview } from './Preview'
 
-type Tab = 'overview' | 'metadata' | 'text' | 'container' | 'json'
+type Tab = 'preview' | 'overview' | 'text' | 'metadata' | 'container' | 'json'
+
+const TABS: { id: Tab; icon: string; label: (r: Receipt) => string; enabled: (r: Receipt) => boolean }[] = [
+  { id: 'preview', icon: 'eye', label: () => 'Preview', enabled: (r) => r.sizeBytes > 0 },
+  { id: 'overview', icon: 'shield', label: (r) => `Findings (${r.findings.length})`, enabled: () => true },
+  { id: 'text', icon: 'text', label: (r) => `Text (${r.text?.units.length ?? 0})`, enabled: (r) => !!r.text?.units.length },
+  { id: 'metadata', icon: 'info', label: () => 'Metadata', enabled: () => true },
+  { id: 'container', icon: 'archive', label: (r) => `Inside (${r.container?.entryCount ?? 0})`, enabled: (r) => !!r.container },
+  { id: 'json', icon: 'code', label: () => 'Receipt', enabled: () => true },
+]
 
 export function DetailPanel() {
   const { selectedPath, files } = useWorkspace()
@@ -13,6 +23,10 @@ export function DetailPanel() {
   const [unit, setUnit] = useState<string | null>(null)
   const file = selectedPath ? fileAt(selectedPath) : undefined
   const receipt = selectedPath ? receiptAt(selectedPath) : undefined
+  useEffect(() => {
+    // Keep the tab unless it does not apply to the newly selected file.
+    if (receipt && !TABS.find((t) => t.id === tab)!.enabled(receipt)) setTab('overview')
+  }, [receipt, tab])
   if (!files.length) return null
   if (!selectedPath || (!file && !receipt)) return <Overview />
   if (file && !receipt) {
@@ -40,12 +54,13 @@ export function DetailPanel() {
         <div className="detail-flags">{r.flags.map((f) => <FlagChip key={f} flag={f} />)}</div>
       </div>
       <div className="tabs" role="tablist">
-        {(['overview', 'metadata', 'text', 'container', 'json'] as Tab[]).map((t) => (
-          <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'active' : ''} onClick={() => setTab(t)} disabled={(t === 'text' && !units.length) || (t === 'container' && !r.container)}>
-            {t === 'overview' ? `Findings (${r.findings.length})` : t === 'text' ? `Text (${units.length})` : t === 'container' ? `Inside (${r.container?.entryCount ?? 0})` : t === 'json' ? 'Receipt JSON' : 'Metadata'}
+        {TABS.map((t) => (
+          <button key={t.id} role="tab" aria-selected={tab === t.id} className={tab === t.id ? 'active' : ''} onClick={() => setTab(t.id)} disabled={!t.enabled(r)}>
+            <Icon name={t.icon} size={14} /> {t.label(r)}
           </button>
         ))}
       </div>
+      {tab === 'preview' && <div className="tab-body"><Preview key={r.path} receipt={r} /></div>}
       {tab === 'overview' && (
         <div className="tab-body">
           <table className="kv">
@@ -180,7 +195,7 @@ function Overview() {
             )}
           </div>
         </div>
-        <p className="muted small">Select a file on the left, or ask your agent: "run a privacy scan and propose what to clean".</p>
+        <p className="muted small">Select a file on the left, or ask your agent: "run a privacy scan and suggest what to clean".</p>
       </div>
     </div>
   )

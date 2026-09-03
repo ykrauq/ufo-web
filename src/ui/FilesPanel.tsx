@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { select, setFilter, type WorkspaceFile } from '../core/workspace'
 import { useWorkspace } from './useWorkspace'
 import { fmtBytes, FlagChip, SeverityDot } from './common'
@@ -29,6 +29,7 @@ type ToolSubmitEvent = Event & { agentInvoked?: boolean; respondWith?: (p: Promi
 export function FilesPanel() {
   const { files, selectedPath, filter } = useWorkspace()
   const formRef = useRef<HTMLFormElement>(null)
+  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({})
   useEffect(() => {
     const form = formRef.current
     if (!form) return
@@ -59,6 +60,7 @@ export function FilesPanel() {
     if (!groups.has(dir)) groups.set(dir, [])
     groups.get(dir)!.push(f)
   }
+  const allCollapsed = groups.size > 0 && [...groups.keys()].every((k) => collapsed[k])
   return (
     <div className="files">
       <form ref={formRef} className="filter" onSubmit={onSubmit}>
@@ -69,34 +71,46 @@ export function FilesPanel() {
         </select>
         <button type="submit" className="filter-go" aria-label="Apply filter"><Icon name="check" size={14} /></button>
       </form>
-      <div className="files-count muted small">{visible.length} of {files.length} files{filter.query || filter.flag ? ' (filtered)' : ''}</div>
-      {[...groups.entries()].map(([dir, list]) => (
-        <div key={dir} className="group">
-          <div className="group-title">{dir === '.' ? '(root)' : dir}</div>
-          {list.map((f) => {
-            const sev = topSeverity(f)
-            const r = f.receipt
-            return (
-              <button key={f.path} className={`file-row${selectedPath === f.path ? ' selected' : ''}${f.quarantined ? ' quarantined' : ''}`} onClick={() => select(f.path)} title={f.path}>
-                <span className="file-main">
-                  {sev ? <SeverityDot severity={sev} /> : <span className="sev sev-none" />}
-                  <Icon name={r ? familyIcon(r.family, r.kind) : 'file'} className="file-icon" />
-                  <span className="file-name">{f.name}</span>
-                  <span className="file-kind">{r ? r.kind : f.status === 'error' ? 'error' : f.status === 'inspecting' ? '…' : 'queued'}</span>
-                  <span className="file-size">{fmtBytes(f.bytes.length)}</span>
-                </span>
-                {r && r.flags.length > 0 && (
-                  <span className="file-flags">
-                    {r.flags.slice(0, 4).map((fl) => <FlagChip key={fl} flag={fl} />)}
-                    {r.flags.length > 4 && <span className="more">+{r.flags.length - 4}</span>}
+      <div className="files-count muted small">
+        <span>{visible.length} of {files.length} files{filter.query || filter.flag ? ' (filtered)' : ''}</span>
+        <button className="link" onClick={() => setCollapsed(Object.fromEntries([...groups.keys()].map((k) => [k, !allCollapsed])))}>{allCollapsed ? 'expand all' : 'collapse all'}</button>
+      </div>
+      {[...groups.entries()].map(([dir, list]) => {
+        const isCollapsed = !!collapsed[dir]
+        const worst = list.map(topSeverity).filter(Boolean)
+        return (
+          <div key={dir} className={`group${isCollapsed ? ' collapsed' : ''}`}>
+            <button className="group-title" onClick={() => setCollapsed({ ...collapsed, [dir]: !isCollapsed })} aria-expanded={!isCollapsed}>
+              <Icon name="chevron" size={12} className="chev" />
+              <Icon name="folder" size={13} />
+              <span>{dir === '.' ? '(root)' : dir}</span>
+              <span className="group-meta muted">{list.length}{worst.includes('high') ? ' · high' : ''}</span>
+            </button>
+            {!isCollapsed && list.map((f) => {
+              const sev = topSeverity(f)
+              const r = f.receipt
+              return (
+                <button key={f.path} className={`file-row${selectedPath === f.path ? ' selected' : ''}${f.quarantined ? ' quarantined' : ''}`} onClick={() => select(f.path)} title={f.path}>
+                  <span className="file-main">
+                    {sev ? <SeverityDot severity={sev} /> : <span className="sev sev-none" />}
+                    <Icon name={r ? familyIcon(r.family, r.kind) : 'file'} className="file-icon" />
+                    <span className="file-name">{f.name}</span>
+                    <span className="file-kind">{r ? r.kind : f.status === 'error' ? 'error' : f.status === 'inspecting' ? '…' : 'queued'}</span>
+                    <span className="file-size">{fmtBytes(f.bytes.length)}</span>
                   </span>
-                )}
-                {(f.quarantined || f.flagged) && <span className="file-flags">{f.quarantined && <span className="badge badge-bad">quarantined</span>}{f.flagged && <span className="badge badge-warn">flagged</span>}</span>}
-              </button>
-            )
-          })}
-        </div>
-      ))}
+                  {r && r.flags.length > 0 && (
+                    <span className="file-flags">
+                      {r.flags.slice(0, 4).map((fl) => <FlagChip key={fl} flag={fl} />)}
+                      {r.flags.length > 4 && <span className="more">+{r.flags.length - 4}</span>}
+                    </span>
+                  )}
+                  {(f.quarantined || f.flagged) && <span className="file-flags">{f.quarantined && <span className="badge badge-bad">quarantined</span>}{f.flagged && <span className="badge badge-warn">flagged</span>}</span>}
+                </button>
+              )
+            })}
+          </div>
+        )
+      })}
     </div>
   )
 }

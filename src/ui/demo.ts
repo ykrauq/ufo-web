@@ -82,7 +82,7 @@ export async function runScriptedDemo(): Promise<void> {
   setDemoRunning(true)
   try {
     const native = !!nativeContext()
-    say('system', native ? 'Scripted demo: a fixed sequence of tool calls sent through the browser\'s WebMCP API (modelContext.getTools + executeTool). No language model is involved. Approvals stay with you.' : 'Scripted demo: a fixed sequence of tool calls through the page\'s tool registry (no WebMCP host detected in this browser). No language model is involved. Approvals stay with you.')
+    say('system', native ? 'Scripted demo: a fixed sequence of tool calls sent through the browser\'s WebMCP API (modelContext.getTools + executeTool). No language model is involved. Executing anything stays with you.' : 'Scripted demo: a fixed sequence of tool calls through the page\'s tool registry (no WebMCP host detected in this browser). No language model is involved. Executing anything stays with you.')
     say('agent', 'Checking what is in the workspace.')
     let status = await invoke('workspace_status', {})
     if (!status.files) {
@@ -134,7 +134,7 @@ export async function runScriptedDemo(): Promise<void> {
     say('agent', `${((tl.events ?? []) as string[]).length} dated events on one timeline${anomalies.length ? `, ${anomalies.length} anomal${anomalies.length === 1 ? 'y' : 'ies'}: ${anomalies[0].slice(0, 120)}` : ''}.`)
     await pause(600)
 
-    say('agent', 'Proposing actions. Your call on each.')
+    say('agent', 'Suggesting actions. Each one is yours to execute or dismiss.')
     const cleanable = files.filter((f) => ['jpeg', 'png', 'docx', 'xlsx', 'pptx', 'pdf', 'docm', 'xlsm', 'pptm'].includes(f.kind) && (f.flags.includes('has_gps') || f.flags.includes('has_author')))
     const strip = cleanable.sort((a, b) => (b.flags.includes('has_gps') ? 4 : 0) + (b.flags.includes('has_device_ids') ? 2 : 0) + b.flags.length - ((a.flags.includes('has_gps') ? 4 : 0) + (a.flags.includes('has_device_ids') ? 2 : 0) + a.flags.length))[0]
     if (strip) await invoke('propose_action', { path: strip.path, action: 'strip_metadata', reason: `Identity metadata (${strip.flags.filter((x) => ['has_gps', 'has_author', 'has_device_ids', 'has_comments', 'has_revision_history'].includes(x)).join(', ')}) would leave with this file.`, severity: 'high' })
@@ -144,17 +144,17 @@ export async function runScriptedDemo(): Promise<void> {
     if (flag) await invoke('propose_action', { path: flag.path, action: 'flag', reason: flag.flags.includes('header_mismatch') ? 'Reply-To points at a different domain than From. Verify by phone before acting on it.' : flag.flags.includes('type_mismatch') ? 'The name and the bytes disagree. Open it as what it really is.' : 'Contains personal-data patterns. Decide whether this should be shared at all.', severity: 'medium' })
     if (!strip && !quarantine && !flag && files[0]) await invoke('propose_action', { path: files[0].path, action: 'note', reason: 'Nothing here needs cleaning. Recording that in the report.', severity: 'info' })
 
-    say('system', 'Waiting for your decisions in the Proposals panel.')
+    say('system', 'Waiting for your decisions in the Suggestions panel.')
     const decided = await waitFor(() => getState().proposals.every((p) => p.status !== 'pending'), 10 * 60_000)
     if (!decided) {
-      say('system', 'No decisions after ten minutes; the demo stops here. Approve or reject whenever you like and call export_report.')
+      say('system', 'No decisions after ten minutes; the demo stops here. Execute or dismiss whenever you like and call export_report.')
       return
     }
     const results = await invoke('list_proposals', {})
     const list = (results.proposals ?? []) as { status: string; action: string; result?: { message?: string } }[]
-    const approved = list.filter((p) => p.status === 'approved')
+    const approved = list.filter((p) => p.status === 'executed')
     const stripResult = approved.find((p) => p.action === 'strip_metadata')?.result?.message
-    say('agent', `${approved.length} approved, ${list.length - approved.length} rejected.${stripResult ? ` ${stripResult[0].toUpperCase()}${stripResult.slice(1)}.` : ''} Exporting the report.`)
+    say('agent', `${approved.length} executed, ${list.length - approved.length} dismissed.${stripResult ? ` ${stripResult[0].toUpperCase()}${stripResult.slice(1)}.` : ''} Exporting the report.`)
     const report = await invoke('export_report', { format: 'markdown' })
     say('agent', `Report ready: ${report.file} (${report.bytes} bytes). It ends with the ufo command line that reproduces these receipts.`)
   } catch (error) {

@@ -80,7 +80,7 @@ function groupedScan(findings: ReturnType<typeof ws.findingsIn>, next: string) {
 const baseTools: ToolSpec<never>[] = [
   {
     name: 'workspace_status',
-    description: 'What is loaded in UFO Web right now: file count, inspection progress, findings by severity, pending proposals. Call this first. If files is 0, call load_sample_case or ask the person to drop files.',
+    description: 'What is loaded in UFO Web right now: file count, inspection progress, findings by severity, pending suggestions. Call this first. If files is 0, call load_sample_case or ask the person to drop files.',
     inputSchema: { type: 'object', properties: {} },
     readOnly: true,
     example: {},
@@ -94,7 +94,7 @@ const baseTools: ToolSpec<never>[] = [
         inspected: s.files.filter((f) => f.status === 'done').length,
         busy: s.busy,
         findings: sev,
-        proposals: { pending: s.proposals.filter((p) => p.status === 'pending').length, approved: s.proposals.filter((p) => p.status === 'approved').length, rejected: s.proposals.filter((p) => p.status === 'rejected').length },
+        suggestions: { pending: s.proposals.filter((p) => p.status === 'pending').length, executed: s.proposals.filter((p) => p.status === 'executed').length, dismissed: s.proposals.filter((p) => p.status === 'dismissed').length },
         sample_loaded: s.sampleLoaded,
         hint: s.files.length ? 'Start with privacy_scan or hidden_content_scan, then inspect, then propose_action.' : EMPTY,
         privacy: 'All processing is in this tab. No file or metadata is sent anywhere.',
@@ -368,7 +368,7 @@ const fileTools: ToolSpec<never>[] = [
   },
   {
     name: 'propose_action',
-    description: 'Propose an action on a file for the person to approve in the UFO Web panel. Actions: note (record a finding), flag (mark for follow-up), strip_metadata (produce a cleaned copy: JPEG/PNG/Office/PDF), rename_extension (offer the file under its true type), quarantine (exclude from export). You cannot approve; only the person can. Give a reason they can act on.',
+    description: 'Suggest an action on a file. The person sees it as a card and either executes it or dismisses it; you cannot execute anything yourself. Actions: note (record a finding), flag (mark for follow-up), strip_metadata (produce a cleaned copy: JPEG/PNG/Office/PDF), rename_extension (offer the file under its true type), quarantine (exclude from export). Give a reason they can act on.',
     inputSchema: {
       type: 'object',
       properties: {
@@ -383,25 +383,25 @@ const fileTools: ToolSpec<never>[] = [
     run: (input: { path: string; action: ws.ProposalAction; reason: string; severity?: 'info' | 'low' | 'medium' | 'high' }) => {
       requireFiles()
       const p = ws.propose(input)
-      return { proposal: p.id, path: p.path, action: p.action, status: p.status, message: 'awaiting the person\'s decision in the Proposals panel; poll list_proposals to see the outcome' }
+      return { proposal: p.id, path: p.path, action: p.action, status: p.status, message: 'suggestion shown to the person; they will execute or dismiss it. Poll list_proposals for the outcome.' }
     },
   },
   {
     name: 'list_proposals',
-    description: 'Proposals so far with the person\'s decision (pending, approved, rejected) and, for approved actions, the result: cleaned-copy name, sha256, items removed, findings before and after.',
+    description: 'Suggestions so far with the person\'s decision (pending, executed, dismissed) and, for executed actions, the result: cleaned-copy name, sha256, items removed, findings before and after.',
     inputSchema: {
       type: 'object',
       properties: {
-        status: { type: 'string', enum: ['pending', 'approved', 'rejected'] },
+        status: { type: 'string', enum: ['pending', 'executed', 'dismissed'] },
       },
     },
     readOnly: true,
     example: {},
-    run: (input: { status?: 'pending' | 'approved' | 'rejected' }) => ({ proposals: ws.listProposals(input.status).map((p) => ({ id: p.id, path: p.path, action: p.action, status: p.status, severity: p.severity, reason: p.reason, decided_at: p.decidedAt, result: p.result })) }),
+    run: (input: { status?: 'pending' | 'executed' | 'dismissed' }) => ({ proposals: ws.listProposals(input.status).map((p) => ({ id: p.id, path: p.path, action: p.action, status: p.status, severity: p.severity, reason: p.reason, decided_at: p.decidedAt, result: p.result })) }),
   },
   {
     name: 'export_report',
-    description: 'Build the investigation report: receipts for every file, all findings, every proposal with the person\'s decision, and the ufo command-line invocations that reproduce the receipts. Offers the file for download in the UI and returns the summary. json (default) or markdown.',
+    description: 'Build the investigation report: receipts for every file, all findings, every suggestion with the person\'s decision, and the ufo command-line invocations that reproduce the receipts. Offers the file for download in the UI and returns the summary. json (default) or markdown.',
     inputSchema: {
       type: 'object',
       properties: {

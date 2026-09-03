@@ -164,7 +164,7 @@ export async function inspectFile(file: InputFile, opts: InspectOptions = {}): P
         }
       }
     } else if (resolved.kind === 'ole' || ['doc', 'xls', 'ppt', 'msg'].includes(resolved.kind)) {
-      receipt.notAvailableInWeb.push(`Legacy OLE container (${info.label}): metadata and content parsing run in the UFO apps and the ufo CLI, not in the browser edition. Reproduce: ${CLI_COMMANDS.inspect}`)
+      receipt.notAvailableInWeb.push(`Legacy OLE container (${info.label}): metadata and content parsing run in the UFO apps, not in the browser edition. Reproduce identity: ${CLI_COMMANDS.inspect}`)
       receipt.findings.push(finalize(file.path, { category: 'info', severity: 'low', where: 'header', title: `${info.label}: not parsed in the browser edition`, detail: 'Legacy binary Office and Outlook formats carry author names, revision logs, and embedded objects too. Inspect them with the UFO desktop app or ufo inspect.' }))
     }
   } catch (error) {
@@ -335,17 +335,17 @@ function scanText(receipt: Receipt, units: TextUnit[], family: string, kind: str
   const injection = scanInjection(corpus)
   if (injection.length) {
     addFlag(receipt, 'has_injection_text')
-    receipt.findings.push(finalize(receipt.path, { category: 'security', severity: 'medium', flag: 'has_injection_text', where: `line ${injection[0].line}`, title: 'Text addressed to AI agents (prompt injection)', detail: 'The file contains instructions aimed at an AI assistant. UFO Web treats all file text as data; approvals are human-only, so the text cannot act. Your agent should ignore it too.', evidence: injection.slice(0, 3).map((h) => `line ${h.line}: ${h.snippet}`).join('\n') }))
+    receipt.findings.push(finalize(receipt.path, { category: 'security', severity: 'medium', flag: 'has_injection_text', where: `line ${injection[0].line}`, title: 'Text addressed to AI agents (prompt injection)', detail: 'The file contains instructions aimed at an AI assistant. UFO Web treats all file text as data, and executing any action is a button only a person can press, so the text cannot act. Your agent should ignore it too.', evidence: injection.slice(0, 3).map((h) => `line ${h.line}: ${h.snippet}`).join('\n') }))
   }
 }
 
 function capabilities(kind: string, family: string): string[] {
   const out: string[] = []
-  out.push(`Batch receipts for a whole tree, identical schema: ${CLI_COMMANDS.inspect}`)
+  out.push(`Batch receipts for a whole tree with the same identity fields (ufo CLI, UFO for Windows 1.1, in store certification): ${CLI_COMMANDS.inspect}`)
   if (family === 'archive') out.push(`Safe extraction with sanitized paths and password support: ${CLI_COMMANDS.extract}`)
   if (family === 'image') out.push(`Image conversion (PNG/JPEG/BMP): ${CLI_COMMANDS.convert}`)
   if (kind === 'pdf' || family === 'text' || family === 'code') out.push(`Text comparison of two files from the shell: ${CLI_COMMANDS.compare}`)
-  if (['document', 'spreadsheet', 'presentation'].includes(family)) out.push('Editing, OCR, redaction, and conversion of Office documents: UFO for Android and Windows, not the browser edition.')
-  if (kind === 'pdf') out.push('PDF editing, OCR, redaction, and page tools: UFO for Android and Windows, not the browser edition.')
+  if (['document', 'spreadsheet', 'presentation'].includes(family)) out.push('Editing, conversion, and full-fidelity layout of Office documents: UFO for Android and Windows, not the browser edition.')
+  if (kind === 'pdf') out.push('PDF editing, OCR, redaction, and page tools: UFO for Android (and Windows once public), not the browser edition.')
   return out
 }
